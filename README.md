@@ -1,67 +1,80 @@
-# InternAI
+InternAI
 
-InternAI is a Next.js app for finding internships, saving opportunities, tracking applications, analyzing resumes, and sending daily internship alerts.
+InternAI is an AI powered platform I built to help university students discover, organize, and apply for internships more efficiently.
 
-## Features
+Why I Built InternAI
 
-- Internship search focused on company career and early-career pages, with Adzuna and SerpAPI as optional coverage providers
-- Company-first search, including searches where the user picks a company without entering a role
-- Filters for role, company, location, season, ordering, and optional resume/profile matching
-- Saved internships and application tracking
-- User auth with Better Auth and Prisma
-- Resume upload, parsing, scoring, and improvement suggestions
-- Daily job alerts that notify users only about newly discovered matching internships
-- Stripe checkout for paid plans
-- Promo codes and an admin-only premium access tool for beta testers or free accounts
-- Vercel cron routes for reminders, weekly digest, and job alerts
+I built InternAI because as someone who was trying to find an internship I found the process of searching for an internship super tedious. I believed there must be a way to automate it so I did that. I built InternAI to simplify that process by combining AI powered search, resume analysis, and application tracking into one platform focused on university students.
 
-## Tech Stack
+Features
 
-- Next.js 16 App Router
-- React 19
-- TypeScript
-- Prisma 6
-- PostgreSQL, tested with Neon on Vercel
-- Better Auth
-- Stripe
-- Resend
-- Vercel Blob
-- Tailwind CSS
-- Biome
-- Vitest
+Search
 
-## Local Setup
+Company-first internship discovery
+AI-powered search refinement
+Application Management
+
+Save internships
+Track applications
+Resume Tools
+
+Resume upload
+AI feedback
+Notifications
+
+Daily internship alerts
+Tech Stack
+
+Next.js 16 App Router
+React 19
+TypeScript
+Prisma 6
+PostgreSQL, tested with Neon on Vercel
+Better Auth
+Stripe
+Resend
+Vercel Blob
+Tailwind CSS
+Biome
+Vitest
+Architecture
+
+Browser
+     │
+     ▼
+Next.js Frontend
+     │
+     ▼
+API Routes
+     │
+ ┌───┴────┐
+ ▼        ▼
+PostgreSQL   AI Services
+     │
+     ▼
+Internship Search APIs
+Local Setup
 
 Install Node.js 20+ and pnpm 11.
 
-```bash
 pnpm install
 cp .env.example .env.local
-```
+Fill in the required variables in .env.local, then run:
 
-Fill in the required variables in `.env.local`, then run:
-
-```bash
 pnpm db:migrate:dev
 pnpm dev
-```
+Open http://localhost:3000.
 
-Open `http://localhost:3000`.
-
-## Required Environment Variables
+Required Environment Variables
 
 For production on Vercel, set these at minimum:
 
-```env
 DATABASE_URL=
 BETTER_AUTH_SECRET=
 NEXT_PUBLIC_APP_URL=
 BETTER_AUTH_URL=
-```
-
 Recommended production variables:
 
-```env
 ADZUNA_APP_ID=
 ADZUNA_APP_KEY=
 SERPAPI_API_KEY=
@@ -74,24 +87,19 @@ STRIPE_BASIC_PRICE_ID=
 STRIPE_PREMIUM_PRICE_ID=
 CRON_SECRET=
 OWNER_EMAIL=
-```
+Do not commit .env.local or any real secrets. This repo only includes .env.example.
 
-Do not commit `.env.local` or any real secrets. This repo only includes `.env.example`.
+Deployment
 
-## Deployment
+See DEPLOYMENT.md for the full Vercel deployment checklist.
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for the full Vercel deployment checklist.
+Useful Commands
 
-## Useful Commands
-
-```bash
 pnpm dev
 pnpm typecheck
 pnpm build
 pnpm db:migrate:deploy
 pnpm db:studio
-```
+Notes
 
-## Notes
-
-LinkedIn and Indeed result links are intentionally excluded for now because the app is not scraping those platforms directly. The search system prioritizes company career pages and verified public sources.
+The search system prioritizes company career pages and verified public sources.
