@@ -1,0 +1,22 @@
+// User-owned profile extension — stores extra per-user fields that cannot go
+// into auth.prisma (framework_owned). Linked by scalar userId (no @relation on
+// the locked User model — see AGENT.md / nextjs-prisma skill).
+model UserProfile {
+  id                  String    @id @default(cuid())
+  userId              String    @unique
+  name                String?
+  university          String?
+  graduationYear      Int?
+  jobKeywords         String?
+  resumeText          String?
+  major               String?
+  gpa                 Float?
+  skills              String?
+  targetRoles         String?
+  targetLocations     String?
+  salaryExpectations  Int?
+  sponsorshipRequired Boolean?
+  updatedAt           DateTime  @updatedAt
+
+  @@index([userId])
+}

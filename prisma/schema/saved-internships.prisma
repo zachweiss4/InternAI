@@ -1,0 +1,10 @@
+model SavedInternship {
+  id        String   @id @default(cuid())
+  userId    String
+  jobId     String
+  jobData   Json
+  savedAt   DateTime @default(now())
+
+  @@unique([userId, jobId])
+  @@index([userId])
+}

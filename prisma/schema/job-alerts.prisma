@@ -1,0 +1,27 @@
+model JobAlert {
+  id             String    @id @default(cuid())
+  userId         String
+  companyNames   String[]
+  field          String?
+  fieldNames     String[]  @default([])
+  location       String?
+  locations      String[]  @default([])
+  season         String?
+  timeframe      String    @default("daily")
+  createdAt      DateTime  @default(now())
+  lastCheckedAt  DateTime?
+  lastNotifiedAt DateTime?
+
+  @@index([userId])
+}
+
+model JobAlertSentJob {
+  id      String   @id @default(cuid())
+  alertId String
+  jobId   String
+  sentAt  DateTime @default(now())
+
+  @@unique([alertId, jobId])
+  @@index([alertId])
+  @@index([sentAt])
+}

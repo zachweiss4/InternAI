@@ -1,0 +1,2 @@
+ALTER TABLE "JobAlert"
+ADD COLUMN "lastCheckedAt" TIMESTAMP(3);

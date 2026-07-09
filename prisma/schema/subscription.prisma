@@ -1,0 +1,55 @@
+// User subscription state — keyed by scalar userId (no @relation to User, which
+// lives in framework-owned auth.prisma). Join by id in app code when needed.
+
+model UserSubscription {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  plan              String    @default("free")   // "free" | "basic" | "premium"
+  status            String    @default("none")   // "active" | "cancelled" | "past_due" | "none"
+  checkoutSessionId String?   @unique
+  currentPeriodEnd  DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model SearchQuota {
+  id        String   @id @default(cuid())
+  userId    String
+  date      String   // UTC date "YYYY-MM-DD"
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+model SubscriptionPromoCode {
+  id             String    @id @default(cuid())
+  code           String    @unique
+  plan           String    @default("premium") // "basic" | "premium"
+  months         Int       @default(12)
+  maxRedemptions Int       @default(1)
+  redeemedCount  Int       @default(0)
+  note           String?
+  createdBy      String?
+  expiresAt      DateTime?
+  disabledAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([code])
+  @@index([disabledAt, expiresAt])
+}
+
+model SubscriptionPromoRedemption {
+  id         String   @id @default(cuid())
+  codeId     String
+  userId     String
+  redeemedAt DateTime @default(now())
+
+  @@unique([codeId, userId])
+  @@index([userId])
+  @@index([codeId])
+}

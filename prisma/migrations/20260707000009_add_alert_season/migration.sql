@@ -1,0 +1,2 @@
+ALTER TABLE "JobAlert"
+ADD COLUMN "season" TEXT;
