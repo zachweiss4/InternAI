@@ -243,6 +243,8 @@ const DAILY_REVALIDATE_SECONDS = 24 * 60 * 60;
 const COMPANY_SITE_CRAWL_LIMIT = 24;
 const COMPANY_SITE_SELECTED_LIMIT = 18;
 const MAX_GENERAL_QUERY_VARIANTS = 6;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const STALE_POSTING_MAX_AGE_DAYS = 180;
 
 const NON_INTERNSHIP_TERMS = [
   'senior',
@@ -1082,6 +1084,44 @@ function seasonSignalForResult(
 
 function containsAny(text: string, terms: string[]): boolean {
   return terms.some((term) => text.includes(term));
+}
+
+function isPastSeasonCycle(season: string, year: number, now = Date.now()): boolean {
+  const current = new Date(now);
+  const currentYear = current.getUTCFullYear();
+  if (year < currentYear) return true;
+  if (year > currentYear) return false;
+
+  const month = current.getUTCMonth() + 1;
+  if (season === 'winter') return month >= 4;
+  if (season === 'spring') return month >= 6;
+  if (season === 'summer') return month >= 7;
+  if (season === 'fall') return month >= 12;
+  return false;
+}
+
+export function isStaleInternshipResult(
+  result: Omit<InternshipSearchResult, 'matchScore'>,
+  now = Date.now(),
+): boolean {
+  const text = normalizeText(`${result.title} ${result.applyUrl}`);
+  const currentYear = new Date(now).getUTCFullYear();
+
+  for (const match of text.matchAll(
+    /\b(?:(summer|fall|spring|winter)\s+(20\d{2})|(20\d{2})\s+(summer|fall|spring|winter))\b/g,
+  )) {
+    const season = match[1] ?? match[4];
+    const year = Number(match[2] ?? match[3]);
+    if (season && Number.isFinite(year) && isPastSeasonCycle(season, year, now)) return true;
+  }
+
+  for (const match of text.matchAll(/\b(20\d{2})\b/g)) {
+    const year = Number(match[1]);
+    if (Number.isFinite(year) && year < currentYear) return true;
+  }
+
+  const postedAt = postingDateTimestamp(result.postedAt);
+  return postedAt > 0 && now - postedAt > STALE_POSTING_MAX_AGE_DAYS * DAY_MS;
 }
 
 function splitProfileList(value?: string | null): string[] {
@@ -2880,19 +2920,69 @@ function isProductManagementQuery(query: string): boolean {
 function matchesRequestedRole(query: string, text: string): boolean {
   const normalized = normalizeText(text);
   if (isProductManagementQuery(query)) {
-    return [
+    const negativeProductRoles = [
+      'product design',
+      'product designer',
+      'ux designer',
+      'ui designer',
+      'product marketing',
+      'integrated product marketing',
+      'product support',
+    ];
+    const explicitProductManagementTerms = [
       'product management',
-      'product manager',
       'associate product manager',
       'technical product manager',
+      'product owner',
       'product strategy',
       'product roadmap',
       'product operations',
-      'product intern',
-    ].some((term) => includesNormalizedTerm(normalized, term));
+      'apm intern',
+      'apm internship',
+    ];
+    const productManagerTerms = ['product manager'];
+    const productManagementContext = [
+      'roadmap',
+      'customer research',
+      'user research',
+      'requirements',
+      'prioritization',
+      'prioritize',
+      'backlog',
+      'stakeholder',
+      'go to market',
+      'market analysis',
+      'product lifecycle',
+      'product discovery',
+    ];
+    const hasNegativeProductRole = negativeProductRoles.some((term) =>
+      includesNormalizedTerm(normalized, term),
+    );
+    const hasExplicitPmSignal = explicitProductManagementTerms.some((term) =>
+      includesNormalizedTerm(normalized, term),
+    );
+    if (hasNegativeProductRole && !hasExplicitPmSignal) return false;
+    if (
+      hasExplicitPmSignal ||
+      productManagerTerms.some((term) => includesNormalizedTerm(normalized, term))
+    ) {
+      return true;
+    }
+
+    const hasProductInternTitle =
+      /\bproduct\b.{0,45}\bintern(ship)?\b/.test(normalized) ||
+      /\bintern(ship)?\b.{0,45}\bproduct\b/.test(normalized);
+    return (
+      hasProductInternTitle &&
+      productManagementContext.some((term) => includesNormalizedTerm(normalized, term))
+    );
   }
 
   return containsRoleSignal(normalized, termsFor(query));
+}
+
+export function normalizeWorkdayPostedAt(job: { postedOn?: string }): string | null {
+  return normalizePostingDate(job.postedOn);
 }
 
 export function workdayJobMatchesSearch(
@@ -2910,7 +3000,7 @@ export function workdayJobMatchesSearch(
     location: detail?.location ?? job.locationsText ?? 'See posting',
     description,
     applyUrl: applyUrl || 'https://example.com/job/workday-listing',
-    postedAt: normalizePostingDate(detail?.startDate ?? job.postedOn),
+    postedAt: normalizeWorkdayPostedAt(job),
     source: 'Company Site',
   };
 
@@ -3033,7 +3123,7 @@ async function searchWorkdayCompanyJobs(
         salaryMin: salary.salaryMin,
         salaryMax: salary.salaryMax,
         applyUrl,
-        postedAt: normalizePostingDate(detail?.startDate ?? job.postedOn),
+        postedAt: normalizeWorkdayPostedAt(job),
         modality: inferModality(`${title} ${location} ${description}`),
         source: 'Company Site' as const,
       },
@@ -3345,7 +3435,10 @@ function scoreAndFilterResults(
     }))
     .filter(
       (result) =>
-        result.matchScore >= 28 && isInternshipFocused(result) && isActionablePosting(result),
+        result.matchScore >= 28 &&
+        isInternshipFocused(result) &&
+        isActionablePosting(result) &&
+        !isStaleInternshipResult(result),
     );
 }
 

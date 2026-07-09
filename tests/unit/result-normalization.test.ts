@@ -16,6 +16,7 @@ describe('posting date normalization', () => {
   it('converts relative provider dates', () => {
     expect(normalizePostingDate('3 days ago', NOW)).toBe('2026-07-05T16:00:00.000Z');
     expect(normalizePostingDate('an hour ago', NOW)).toBe('2026-07-08T15:00:00.000Z');
+    expect(normalizePostingDate('Posted 30+ Days Ago', NOW)).toBe('2026-06-08T16:00:00.000Z');
   });
 
   it('does not pretend missing or invalid dates were posted today', () => {

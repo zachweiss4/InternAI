@@ -6,9 +6,11 @@ vi.mock('server-only', () => ({}));
 let hasExplicitInternshipListingSignal: typeof import('@/lib/search/internships').hasExplicitInternshipListingSignal;
 let extractGoogleDetailResult: typeof import('@/lib/search/internships').extractGoogleDetailResult;
 let isActionablePosting: typeof import('@/lib/search/internships').isActionablePosting;
+let isStaleInternshipResult: typeof import('@/lib/search/internships').isStaleInternshipResult;
 let isSpecificJobUrl: typeof import('@/lib/search/internships').isSpecificJobUrl;
 let inferEmployerFromUrl: typeof import('@/lib/search/internships').inferEmployerFromUrl;
 let mapTheirStackJob: typeof import('@/lib/search/internships').mapTheirStackJob;
+let normalizeWorkdayPostedAt: typeof import('@/lib/search/internships').normalizeWorkdayPostedAt;
 let shouldUseTheirStackBoost: typeof import('@/lib/search/internships').shouldUseTheirStackBoost;
 let workdayJobMatchesSearch: typeof import('@/lib/search/internships').workdayJobMatchesSearch;
 
@@ -18,8 +20,10 @@ beforeAll(async () => {
     hasExplicitInternshipListingSignal,
     inferEmployerFromUrl,
     isActionablePosting,
+    isStaleInternshipResult,
     isSpecificJobUrl,
     mapTheirStackJob,
+    normalizeWorkdayPostedAt,
     shouldUseTheirStackBoost,
     workdayJobMatchesSearch,
   } = await import('@/lib/search/internships'));
@@ -190,6 +194,62 @@ describe('individual listing validation', () => {
         {
           jobDescription: 'Design product experiences with the UX team.',
         },
+      ),
+    ).toBe(false);
+  });
+
+  it('does not confuse Workday product-marketing roles with product management', () => {
+    expect(
+      workdayJobMatchesSearch(
+        'product management',
+        {
+          title: 'Product Marketing Intern',
+          externalPath: '/job/Wilmington/Product-Marketing-Intern_R9999',
+        },
+        {
+          jobDescription: 'Support brand campaigns, product messaging, and retail marketing.',
+        },
+      ),
+    ).toBe(false);
+  });
+
+  it('keeps product internships with product-management context', () => {
+    expect(
+      workdayJobMatchesSearch(
+        'product management',
+        {
+          title: 'Product Development Intern',
+          externalPath: '/job/New-York/Product-Development-Intern_R2468',
+        },
+        {
+          jobDescription:
+            'Partner with stakeholders on product roadmap, customer research, requirements, and prioritization.',
+        },
+      ),
+    ).toBe(true);
+  });
+
+  it('uses Workday postedOn instead of internship startDate for displayed posting age', () => {
+    expect(normalizeWorkdayPostedAt({ postedOn: 'Posted 30+ Days Ago' })).not.toBeNull();
+  });
+
+  it('filters obviously stale internship cycles', () => {
+    expect(
+      isStaleInternshipResult(
+        result({
+          title: 'Product Management Intern - Summer 2025',
+          applyUrl: 'https://example.com/jobs/product-management-intern-summer-2025',
+        }),
+        Date.UTC(2026, 6, 9, 12, 0, 0),
+      ),
+    ).toBe(true);
+    expect(
+      isStaleInternshipResult(
+        result({
+          title: 'Product Management Intern - Summer 2027',
+          applyUrl: 'https://example.com/jobs/product-management-intern-summer-2027',
+        }),
+        Date.UTC(2026, 6, 9, 12, 0, 0),
       ),
     ).toBe(false);
   });

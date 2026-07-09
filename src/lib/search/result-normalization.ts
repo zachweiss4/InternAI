@@ -14,7 +14,9 @@ export function normalizePostingDate(value?: string | null, now = Date.now()): s
     return new Date(now - DAY_MS).toISOString();
   }
 
-  const relative = lower.match(/\b(\d+|an?|one)\s+(minute|hour|day|week|month)s?(?:\s+ago)?\b/);
+  const relative = lower.match(
+    /\b(\d+|an?|one)\+?\s+(minute|hour|day|week|month)s?(?:\s+ago)?\b/,
+  );
   if (relative) {
     const amount = /^(a|an|one)$/.test(relative[1] ?? '') ? 1 : Number(relative[1]);
     const unit = relative[2];
