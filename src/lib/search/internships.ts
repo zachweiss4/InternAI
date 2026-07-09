@@ -2,6 +2,11 @@ import 'server-only';
 import type { IncomingHttpHeaders } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { COMPANY_DIRECTORY, type CompanyDirectoryEntry } from '@/lib/search/company-directory';
+import {
+  normalizePostingDate,
+  normalizeUnixPostingDate,
+  postingDateTimestamp,
+} from '@/lib/search/result-normalization';
 
 export type InternshipSource =
   | 'Adzuna'
@@ -11,6 +16,7 @@ export type InternshipSource =
   | 'SmartRecruiters'
   | 'Company Site'
   | 'Google Jobs'
+  | 'TheirStack'
   | 'Web Search';
 
 export interface InternshipSearchResult {
@@ -22,7 +28,7 @@ export interface InternshipSearchResult {
   salaryMax?: number;
   modality?: 'remote' | 'hybrid' | 'on-site';
   applyUrl: string;
-  postedAt: string;
+  postedAt: string | null;
   matchScore?: number;
   seasonMatch?: 'summer' | 'fall';
   fitReasons?: string[];
@@ -130,6 +136,16 @@ interface WorkdayJob {
   timeType?: string;
 }
 
+interface WorkdayJobPostingInfo {
+  title?: string;
+  jobDescription?: string;
+  location?: string;
+  additionalLocations?: string[];
+  startDate?: string;
+  timeType?: string;
+  jobReqId?: string;
+}
+
 interface EightfoldJob {
   id?: string | number;
   displayJobId?: string;
@@ -168,6 +184,25 @@ interface SerpOrganicResult {
   date?: string;
   source?: string;
   displayed_link?: string;
+}
+
+interface TheirStackJob {
+  id?: number | string;
+  job_title?: string;
+  company?: string;
+  location?: string;
+  long_location?: string;
+  short_location?: string;
+  locations?: Array<{ display_name?: string }>;
+  description?: string;
+  final_url?: string;
+  url?: string;
+  source_url?: string;
+  date_posted?: string;
+  min_annual_salary_usd?: number | null;
+  max_annual_salary_usd?: number | null;
+  remote?: boolean;
+  hybrid?: boolean;
 }
 
 interface SmartRecruitersPosting {
@@ -258,8 +293,102 @@ const US_COUNTRY_ALIASES = [
   'us',
   'u s',
   'u s a',
-  'america',
 ];
+
+const NON_US_COUNTRY_MARKERS = [
+  'argentina',
+  'australia',
+  'austria',
+  'belgium',
+  'brazil',
+  'canada',
+  'chile',
+  'china',
+  'colombia',
+  'costa rica',
+  'czech republic',
+  'denmark',
+  'finland',
+  'france',
+  'germany',
+  'hong kong',
+  'hungary',
+  'india',
+  'indonesia',
+  'ireland',
+  'israel',
+  'italy',
+  'japan',
+  'malaysia',
+  'mexico',
+  'netherlands',
+  'new zealand',
+  'norway',
+  'philippines',
+  'poland',
+  'portugal',
+  'romania',
+  'singapore',
+  'south africa',
+  'south korea',
+  'spain',
+  'sweden',
+  'switzerland',
+  'taiwan',
+  'thailand',
+  'turkey',
+  'united arab emirates',
+  'united kingdom',
+  'vietnam',
+];
+
+const NON_US_COUNTRY_CODES = new Set([
+  'ae',
+  'ar',
+  'at',
+  'au',
+  'be',
+  'br',
+  'ca',
+  'ch',
+  'cl',
+  'cn',
+  'co',
+  'cr',
+  'cz',
+  'de',
+  'dk',
+  'es',
+  'fi',
+  'fr',
+  'gb',
+  'hk',
+  'hu',
+  'id',
+  'ie',
+  'il',
+  'in',
+  'it',
+  'jp',
+  'kr',
+  'mx',
+  'my',
+  'nl',
+  'no',
+  'nz',
+  'ph',
+  'pl',
+  'pt',
+  'ro',
+  'se',
+  'sg',
+  'th',
+  'tr',
+  'tw',
+  'uk',
+  'vn',
+  'za',
+]);
 
 const US_STATE_ALIASES: Record<string, string[]> = {
   alabama: ['alabama', 'al'],
@@ -371,6 +500,7 @@ const SOURCE_QUALITY: Record<InternshipSource, number> = {
   SmartRecruiters: 17,
   'Company Site': 19,
   'Google Jobs': 5,
+  TheirStack: 18,
   'Web Search': -4,
 };
 
@@ -704,7 +834,10 @@ function containsLocationAlias(normalizedValue: string, alias: string): boolean 
 
 function isUsLocationFilter(filter: string): boolean {
   const normalizedFilter = normalizeLocationText(filter);
-  return US_COUNTRY_ALIASES.some((alias) => normalizeLocationText(alias) === normalizedFilter);
+  return (
+    normalizedFilter === 'america' ||
+    US_COUNTRY_ALIASES.some((alias) => normalizeLocationText(alias) === normalizedFilter)
+  );
 }
 
 function stateAliasesForFilter(filter: string): string[] {
@@ -746,7 +879,7 @@ function hasUsStateAbbreviation(location: string): boolean {
   });
 }
 
-function matchesLocationFilter(
+export function matchesLocationFilter(
   location: string,
   filter?: string | null,
   modality?: InternshipSearchResult['modality'],
@@ -760,15 +893,27 @@ function matchesLocationFilter(
     return modality === 'remote' || containsLocationAlias(normalizedLocation, 'remote');
   }
   if (isUsLocationFilter(filter)) {
-    return (
-      modality === 'remote' ||
+    const hasUsSignal =
       US_COUNTRY_ALIASES.some((alias) => containsLocationAlias(normalizedLocation, alias)) ||
       Object.values(US_STATE_ALIASES)
         .flat()
         .filter((alias) => normalizeLocationText(alias).length > 2)
         .some((alias) => containsLocationAlias(normalizedLocation, alias)) ||
-      hasUsStateAbbreviation(location)
+      hasUsStateAbbreviation(location);
+    if (hasUsSignal) return true;
+
+    const hasExplicitForeignCountry = NON_US_COUNTRY_MARKERS.some((country) =>
+      containsLocationAlias(normalizedLocation, country),
     );
+    const locationPrefix = location
+      .trim()
+      .toLowerCase()
+      .match(/^([a-z]{2})[-,:]/)?.[1];
+    const hasExplicitForeignCountryCode = Boolean(
+      locationPrefix && NON_US_COUNTRY_CODES.has(locationPrefix),
+    );
+    if (hasExplicitForeignCountry || hasExplicitForeignCountryCode) return false;
+    return true;
   }
 
   return locationAliasesForFilter(filter).some((alias) =>
@@ -1159,11 +1304,20 @@ function hasStrongInternshipSignal(text: string): boolean {
   );
 }
 
-function hasExplicitInternshipListingSignal(
+function postingUrlText(rawUrl: string): string {
+  try {
+    const url = new URL(rawUrl);
+    return normalizeText(`${url.hostname} ${decodeURIComponent(url.pathname)}`);
+  } catch {
+    return normalizeText(rawUrl.split(/[?#]/)[0] ?? '');
+  }
+}
+
+export function hasExplicitInternshipListingSignal(
   result: Omit<InternshipSearchResult, 'matchScore'>,
 ): boolean {
   const title = normalizeText(result.title);
-  const applyUrl = normalizeText(result.applyUrl);
+  const applyUrl = postingUrlText(result.applyUrl);
   const description = normalizeText(result.description ?? '');
   const primary = `${title} ${applyUrl}`;
   const allText = `${primary} ${description}`;
@@ -1224,27 +1378,6 @@ function parseSalaryRange(text?: string): { salaryMin?: number; salaryMax?: numb
     .filter((n) => n >= 10);
   if (matches.length === 0) return {};
   return { salaryMin: Math.min(...matches), salaryMax: Math.max(...matches) };
-}
-
-function parsePostedAt(value?: string): string {
-  if (!value) return new Date().toISOString();
-  const lower = value.toLowerCase();
-  const amount = Number(lower.match(/\d+/)?.[0] ?? 0);
-  if (lower.includes('hour')) return new Date(Date.now() - amount * 60 * 60 * 1000).toISOString();
-  if (lower.includes('day'))
-    return new Date(Date.now() - amount * 24 * 60 * 60 * 1000).toISOString();
-  if (lower.includes('week'))
-    return new Date(Date.now() - amount * 7 * 24 * 60 * 60 * 1000).toISOString();
-  if (lower.includes('month'))
-    return new Date(Date.now() - amount * 30 * 24 * 60 * 60 * 1000).toISOString();
-  const parsed = Date.parse(value);
-  return Number.isNaN(parsed) ? new Date().toISOString() : new Date(parsed).toISOString();
-}
-
-function parseUnixTimestamp(value?: number): string {
-  if (!value || !Number.isFinite(value)) return new Date().toISOString();
-  const milliseconds = value > 10_000_000_000 ? value : value * 1000;
-  return new Date(milliseconds).toISOString();
 }
 
 function resultHost(result: Omit<InternshipSearchResult, 'matchScore'>): string | null {
@@ -1377,7 +1510,7 @@ function isInternshipFocused(result: Omit<InternshipSearchResult, 'matchScore'>)
   return hasExplicitInternshipListingSignal(result) && !hasFullTimeCareerSignal(result);
 }
 
-function isActionablePosting(result: Omit<InternshipSearchResult, 'matchScore'>): boolean {
+export function isActionablePosting(result: Omit<InternshipSearchResult, 'matchScore'>): boolean {
   const title = normalizeText(result.title);
   if (
     /^(search|explore|find|view|learn|see)\b/.test(title) ||
@@ -1399,9 +1532,7 @@ function isActionablePosting(result: Omit<InternshipSearchResult, 'matchScore'>)
       normalizedUrl.includes('amazon jobs') ||
       normalizedUrl.includes('eightfold') ||
       normalizedUrl.includes('metacareers dejobs');
-    const hasJobDetailPath = /\/(job|jobs|positions|postings|requisitions)\/[^/]+/i.test(
-      url.pathname,
-    );
+    const hasJobDetailPath = isLikelyIndividualPostingUrl(url);
     const looksLikeProgramPage =
       /career-areas|careerprograms|students|early-career|entry-level|internships$|universityinternship/i.test(
         url.pathname,
@@ -1409,14 +1540,10 @@ function isActionablePosting(result: Omit<InternshipSearchResult, 'matchScore'>)
     const looksLikeMediaPage = /\/(media|video|videos|blog|blogs|news)\//i.test(url.pathname);
     const explicitInternshipPosting = hasExplicitInternshipListingSignal(result);
 
-    if (
-      looksLikeProgramPage &&
-      !explicitInternshipPosting &&
-      !knownPostingHost &&
-      !hasJobDetailPath
-    ) {
+    if (!hasJobDetailPath && (result.source === 'Company Site' || result.source === 'Web Search')) {
       return false;
     }
+    if (looksLikeProgramPage && !explicitInternshipPosting && !knownPostingHost) return false;
     if (looksLikeMediaPage && !knownPostingHost && !hasJobDetailPath) return false;
   } catch {
     return false;
@@ -1529,31 +1656,74 @@ function titleFromUrl(url: string, fallback: string): string {
   return fallback;
 }
 
-function locationFromJobUrl(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    const stateAbbreviations = new Set(
-      Object.values(US_STATE_ALIASES)
-        .flat()
-        .map((alias) => normalizeLocationText(alias))
-        .filter((alias) => alias.length === 2 && alias !== 'in'),
-    );
+function isLikelyIndividualPostingUrl(url: URL): boolean {
+  const segments = url.pathname.split('/').filter(Boolean);
+  const genericSegments = new Set([
+    'apply',
+    'applications',
+    'careers',
+    'details',
+    'find-jobs',
+    'job-search',
+    'jobs',
+    'openings',
+    'opportunities',
+    'positions',
+    'postings',
+    'requisitions',
+    'results',
+    'search',
+    'search-results',
+  ]);
 
-    for (const segment of parsed.pathname.split('/').filter(Boolean)) {
-      const match = segment.match(/^([a-z]+(?:-[a-z]+)*)-([a-z]{2,3})$/i);
-      const state = match?.[2]?.toLowerCase();
-      if (!match?.[1] || !state || !stateAbbreviations.has(state)) continue;
-      const city = match[1].replace(/-/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
-      return `${city}, ${state.toUpperCase()}`;
-    }
-  } catch {
-    return null;
+  if (
+    /[?&](job|jobId|job_id|gh_jid|req|reqId|requisition|posting|position)=([^&]+)/i.test(url.search)
+  ) {
+    return true;
   }
 
-  return null;
+  const host = url.hostname.replace(/^www\./, '').toLowerCase();
+  if (
+    (host.endsWith('lever.co') || host.endsWith('ashbyhq.com')) &&
+    segments.length >= 2 &&
+    !genericSegments.has((segments[1] ?? '').toLowerCase())
+  ) {
+    return true;
+  }
+  if (
+    host.endsWith('smartrecruiters.com') &&
+    segments.length >= 2 &&
+    !genericSegments.has((segments[1] ?? '').toLowerCase())
+  ) {
+    return true;
+  }
+
+  for (let index = 0; index < segments.length - 1; index++) {
+    const segment = (segments[index] ?? '').toLowerCase();
+    const next = (segments[index + 1] ?? '').toLowerCase();
+    if (
+      ['detail', 'details', 'job', 'jobs', 'position', 'positions', 'posting', 'postings'].includes(
+        segment,
+      ) &&
+      next &&
+      !genericSegments.has(next)
+    ) {
+      return true;
+    }
+    if (
+      segment === 'results' &&
+      next &&
+      !genericSegments.has(next) &&
+      /(?:\d{5,}|[a-f0-9-]{12,})/i.test(next)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
-function isSpecificJobUrl(url: string, careerUrl: string): boolean {
+export function isSpecificJobUrl(url: string, careerUrl: string): boolean {
   try {
     const parsed = new URL(url);
     const career = new URL(careerUrl);
@@ -1565,21 +1735,7 @@ function isSpecificJobUrl(url: string, careerUrl: string): boolean {
     ) {
       return false;
     }
-    if (
-      /\/(details|jobs?\/results|jobs?|careers?|positions?|postings?|requisitions?|applications?)\/.+/i.test(
-        parsed.pathname,
-      )
-    ) {
-      return true;
-    }
-    if (
-      /[?&](job|jobId|job_id|gh_jid|lever-origin|req|reqId|requisition|posting|position)=/i.test(
-        parsed.search,
-      )
-    ) {
-      return true;
-    }
-    return /job|position|posting|requisition|req/i.test(url);
+    return isLikelyIndividualPostingUrl(parsed);
   } catch {
     return false;
   }
@@ -1720,11 +1876,9 @@ function mapEmbeddedJob(
     location: location || 'See posting',
     description: stripHtml(description) ?? `Found on ${entry.name}'s careers site.`,
     applyUrl,
-    postedAt:
-      stringValue(job.postedDate) ??
-      stringValue(job.postDateInGMT) ??
-      stringValue(job.dateCreated) ??
-      new Date().toISOString(),
+    postedAt: normalizePostingDate(
+      stringValue(job.postedDate) ?? stringValue(job.postDateInGMT) ?? stringValue(job.dateCreated),
+    ),
     modality: inferModality(`${title} ${location} ${description ?? ''}`),
     source: 'Company Site',
   };
@@ -1828,7 +1982,7 @@ function extractStructuredJobResults(
           description:
             stripHtml(stringValue(job.description)) ?? `Found on ${entry.name}'s careers site.`,
           applyUrl: toAbsoluteUrl(applyUrl, pageUrl) ?? pageUrl,
-          postedAt: stringValue(job.datePosted) ?? new Date().toISOString(),
+          postedAt: normalizePostingDate(stringValue(job.datePosted)),
           modality: inferModality(`${title} ${stringValue(job.description) ?? ''}`),
           source: 'Company Site',
         });
@@ -1864,7 +2018,7 @@ function extractCompanySiteResults(
     if (!isSpecificJobUrl(applyUrl, entry.careerUrl)) continue;
 
     const anchorText = decodeHtml(stripHtml(match[2]) ?? '');
-    const urlText = decodeURIComponent(applyUrl).replace(/[-_/]/g, ' ');
+    const urlText = postingUrlText(applyUrl);
     const haystack = `${anchorText} ${urlText}`;
     if (!hasInternshipSignal(normalizeText(haystack))) continue;
     if (!containsRoleSignal(haystack, queryTerms)) continue;
@@ -1880,7 +2034,7 @@ function extractCompanySiteResults(
       location: 'See posting',
       description: `Found on ${entry.name}'s careers site.`,
       applyUrl,
-      postedAt: new Date().toISOString(),
+      postedAt: null,
       modality: inferModality(haystack),
       source: 'Company Site',
     });
@@ -1942,13 +2096,73 @@ function extractGoogleCareerResults(
       location,
       description: 'Found on Google Careers.',
       applyUrl,
-      postedAt: new Date().toISOString(),
+      postedAt: null,
       modality: inferModality(`${title} ${location}`),
       source: 'Company Site',
     });
   }
 
   return results;
+}
+
+export function extractGoogleDetailResult(
+  html: string,
+  pageUrl: string,
+  entry: CompanyDirectoryEntry,
+): InternshipSearchResult | null {
+  if (!matchesCompanyEntry(entry, 'Google')) return null;
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(pageUrl);
+  } catch {
+    return null;
+  }
+  if (!/\/jobs\/results\/\d{5,}[^/]*\/?$/i.test(parsedUrl.pathname)) return null;
+
+  const titleMatch =
+    html.match(/<meta\b[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["'][^>]*>/i) ??
+    html.match(/<meta\b[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["'][^>]*>/i);
+  const title = stripHtml(decodeHtml(titleMatch?.[1] ?? ''));
+  if (!title) return null;
+
+  const applyIndex = Math.max(
+    html.indexOf('id="apply-action-button"'),
+    html.indexOf("id='apply-action-button'"),
+  );
+  let location = 'See posting';
+  if (applyIndex >= 0) {
+    const headerStart = Math.max(
+      html.lastIndexOf('<div class="op1BBf"', applyIndex),
+      html.lastIndexOf("<div class='op1BBf'", applyIndex),
+    );
+    const header = html.slice(Math.max(0, headerStart), applyIndex);
+    const locations = [
+      ...header.matchAll(
+        /<span\b[^>]*class=["'][^"']*\br0wTof\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/gi,
+      ),
+    ]
+      .map((match) => stripHtml(match[1]))
+      .filter((value): value is string => Boolean(value));
+    if (locations.length > 0) location = locations.join('; ');
+  }
+
+  const descriptionMatch =
+    html.match(/<meta\b[^>]*name=["']description["'][^>]*content=["']([^"']+)["'][^>]*>/i) ??
+    html.match(/<meta\b[^>]*content=["']([^"']+)["'][^>]*name=["']description["'][^>]*>/i);
+  const description = stripHtml(decodeHtml(descriptionMatch?.[1] ?? ''));
+
+  return {
+    id: stableId('Company Site', parsedUrl.pathname, title, entry.name),
+    title,
+    company: entry.name,
+    location,
+    description: description ?? 'Found on Google Careers.',
+    applyUrl: pageUrl,
+    postedAt: null,
+    modality: inferModality(`${title} ${location} ${description ?? ''}`),
+    source: 'Company Site',
+  };
 }
 
 function stableId(
@@ -1962,14 +2176,42 @@ function stableId(
     .replace(/[^a-z0-9]+/g, '-')}`;
 }
 
+function canonicalPostingUrl(rawUrl: string): string | null {
+  try {
+    const url = new URL(rawUrl);
+    const pathname = url.pathname.replace(/\/+$/, '') || '/';
+    return `${url.hostname.replace(/^www\./, '').toLowerCase()}${pathname.toLowerCase()}`;
+  } catch {
+    return null;
+  }
+}
+
+function resultCompleteness(result: ScoredInternshipSearchResult): number {
+  const normalizedLocation = normalizeLocationText(result.location);
+  const hasSpecificLocation =
+    normalizedLocation !== '' &&
+    normalizedLocation !== 'unknown' &&
+    normalizedLocation !== 'see posting';
+  const hasDetailedDescription =
+    Boolean(result.description) && !/^found on .+ careers site\.?$/i.test(result.description ?? '');
+  return (
+    result.matchScore +
+    (hasSpecificLocation ? 12 : 0) +
+    (result.postedAt ? 8 : 0) +
+    (hasDetailedDescription ? 4 : 0)
+  );
+}
+
 function dedupe(results: ScoredInternshipSearchResult[]): ScoredInternshipSearchResult[] {
   const seen = new Map<string, ScoredInternshipSearchResult>();
   for (const result of results) {
-    const key = `${result.company}|${result.title}|${result.location}`
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, ' ');
+    const key =
+      canonicalPostingUrl(result.applyUrl) ??
+      `${result.company}|${result.title}|${result.location}`
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ');
     const current = seen.get(key);
-    if (!current || result.matchScore > current.matchScore) {
+    if (!current || resultCompleteness(result) > resultCompleteness(current)) {
       seen.set(key, result);
     }
   }
@@ -1982,12 +2224,12 @@ function sortResults(
 ): ScoredInternshipSearchResult[] {
   return results.sort((a, b) => {
     if (sort === 'newest') {
-      const dateDiff = new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime();
+      const dateDiff = postingDateTimestamp(b.postedAt) - postingDateTimestamp(a.postedAt);
       if (dateDiff !== 0) return dateDiff;
       return b.matchScore - a.matchScore;
     }
     if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
-    return new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime();
+    return postingDateTimestamp(b.postedAt) - postingDateTimestamp(a.postedAt);
   });
 }
 
@@ -2024,7 +2266,7 @@ async function searchAdzuna(
     applyUrl: job.redirect_url,
     salaryMin: job.salary_min,
     salaryMax: job.salary_max,
-    postedAt: job.created ?? new Date().toISOString(),
+    postedAt: normalizePostingDate(job.created),
     modality: inferModality(
       `${job.title} ${job.location?.display_name ?? ''} ${job.description ?? ''}`,
     ),
@@ -2046,7 +2288,7 @@ async function searchGreenhouseBoard(
     location: job.location?.name ?? 'Unknown',
     description: stripHtml(job.departments?.map((department) => department.name).join(', ')),
     applyUrl: job.absolute_url ?? `https://boards.greenhouse.io/${board}`,
-    postedAt: job.updated_at ?? new Date().toISOString(),
+    postedAt: null,
     modality: inferModality(`${job.title} ${job.location?.name ?? ''} ${job.content ?? ''}`),
     source: 'Greenhouse',
   }));
@@ -2064,7 +2306,7 @@ async function searchLeverBoard(
     location: job.categories?.location ?? 'Unknown',
     description: stripHtml(job.descriptionPlain),
     applyUrl: job.hostedUrl ?? `https://jobs.lever.co/${company}`,
-    postedAt: job.createdAt ? new Date(job.createdAt).toISOString() : new Date().toISOString(),
+    postedAt: normalizeUnixPostingDate(job.createdAt),
     modality: inferModality(
       `${job.text ?? ''} ${job.categories?.location ?? ''} ${job.descriptionPlain ?? ''}`,
     ),
@@ -2087,7 +2329,7 @@ async function searchAshbyBoard(
     location: job.location ?? 'Unknown',
     description: stripHtml(job.descriptionPlain),
     applyUrl: job.jobUrl ?? `https://jobs.ashbyhq.com/${company}`,
-    postedAt: job.publishedAt ?? new Date().toISOString(),
+    postedAt: normalizePostingDate(job.publishedAt),
     modality: inferModality(
       `${job.title ?? ''} ${job.location ?? ''} ${job.descriptionPlain ?? ''}`,
     ),
@@ -2141,11 +2383,104 @@ async function searchGoogleJobs(
       applyUrl,
       salaryMin: salary.salaryMin,
       salaryMax: salary.salaryMax,
-      postedAt: parsePostedAt(job.detected_extensions?.posted_at),
+      postedAt: normalizePostingDate(job.detected_extensions?.posted_at),
       modality: inferModality(`${job.title ?? ''} ${job.location ?? ''} ${job.description ?? ''}`),
       source: 'Google Jobs',
     };
   });
+}
+
+function theirStackCountryCode(location?: string | null): string | null {
+  if (!location?.trim()) return null;
+  if (isUsLocationFilter(location) || stateAliasesForFilter(location).length > 0) return 'US';
+  return null;
+}
+
+export function mapTheirStackJob(job: TheirStackJob): InternshipSearchResult | null {
+  const title = stringValue(job.job_title);
+  const company = stringValue(job.company);
+  const applyUrl = stringValue(job.final_url) ?? stringValue(job.url);
+  if (!title || !company || !applyUrl) return null;
+
+  const enhancedLocations = (job.locations ?? [])
+    .map((location) => stringValue(location.display_name))
+    .filter((location): location is string => Boolean(location));
+  const location =
+    stringValue(job.long_location) ??
+    stringValue(job.location) ??
+    stringValue(job.short_location) ??
+    enhancedLocations.join('; ');
+  const modality = job.remote
+    ? 'remote'
+    : job.hybrid
+      ? 'hybrid'
+      : inferModality(`${title} ${location ?? ''} ${job.description ?? ''}`);
+
+  return {
+    id: stableId('TheirStack', job.id ?? applyUrl, title, company),
+    title,
+    company,
+    location: location || 'See posting',
+    description: stripHtml(job.description),
+    applyUrl,
+    postedAt: normalizePostingDate(job.date_posted),
+    salaryMin:
+      typeof job.min_annual_salary_usd === 'number' ? job.min_annual_salary_usd : undefined,
+    salaryMax:
+      typeof job.max_annual_salary_usd === 'number' ? job.max_annual_salary_usd : undefined,
+    modality,
+    source: 'TheirStack',
+  };
+}
+
+async function searchTheirStack(
+  query: string,
+  location?: string | null,
+  company?: string | null,
+): Promise<InternshipSearchResult[]> {
+  const apiKey = process.env.THEIRSTACK_API_KEY;
+  if (!apiKey) return [];
+
+  const role = query.replace(/\b(internships?|interns?|co[\s-]?op)\b/gi, ' ').trim();
+  const countryCode = theirStackCountryCode(location);
+  const body: Record<string, unknown> = {
+    posted_at_max_age_days: 45,
+    is_closed: false,
+    job_title_pattern_or: [
+      '\\b(intern|internship|co[ -]?op|student researcher|summer analyst|summer associate)\\b',
+    ],
+    property_exists_and: ['final_url'],
+    url_domain_not: ['linkedin.com', 'indeed.com'],
+    limit: 20,
+    page: 0,
+  };
+  if (role) body.job_title_or = [role];
+  if (company?.trim()) body.company_name_partial_match_or = [company.trim()];
+  if (countryCode) body.job_country_code_or = [countryCode];
+  if (normalizeLocationText(location ?? '') === 'remote') body.remote = true;
+
+  try {
+    const response = await withTimeout(
+      fetch('https://api.theirstack.com/v1/jobs/search', {
+        method: 'POST',
+        cache: 'force-cache',
+        next: { revalidate: DAILY_REVALIDATE_SECONDS },
+        headers: {
+          accept: 'application/json',
+          authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      }),
+    );
+    if (!response.ok) return [];
+    const payload = (await response.json()) as { data?: TheirStackJob[] };
+    return (payload.data ?? [])
+      .map(mapTheirStackJob)
+      .filter((job): job is InternshipSearchResult => Boolean(job));
+  } catch {
+    return [];
+  }
 }
 
 async function searchWebResults(
@@ -2193,7 +2528,7 @@ async function searchWebResults(
         location: location ?? 'See posting',
         description,
         applyUrl,
-        postedAt: parsePostedAt(result.date),
+        postedAt: null,
         modality: inferModality(`${title} ${description}`),
         source: 'Web Search' as const,
       };
@@ -2305,7 +2640,7 @@ async function searchSmartRecruitersBoard(
         location,
         description,
         applyUrl,
-        postedAt: posting.releasedDate ?? new Date().toISOString(),
+        postedAt: normalizePostingDate(posting.releasedDate),
         modality: inferModality(`${title} ${location} ${description ?? ''}`),
         source: 'SmartRecruiters' as const,
       };
@@ -2355,7 +2690,7 @@ async function searchAmazonCompanyJobs(
       location: location || 'See posting',
       description,
       applyUrl,
-      postedAt: parsePostedAt(job.posted_date ?? job.updated_time),
+      postedAt: normalizePostingDate(job.posted_date),
       modality: inferModality(`${title} ${location} ${description ?? ''}`),
       source: 'Company Site',
     };
@@ -2444,9 +2779,105 @@ async function postWorkdayJson<T>(
   }
 }
 
+async function getWorkdayJson<T>(
+  url: string,
+  cookie?: string,
+  referer?: string,
+): Promise<T | null> {
+  try {
+    const response = await requestText(url, {
+      headers: {
+        accept: 'application/json',
+        'user-agent': 'Mozilla/5.0',
+        ...(cookie ? { cookie } : {}),
+        ...(referer ? { referer } : {}),
+      },
+    });
+    if (response.status < 200 || response.status >= 300) return null;
+    return JSON.parse(response.text) as T;
+  } catch {
+    return null;
+  }
+}
+
+function isProductManagementQuery(query: string): boolean {
+  const normalized = normalizeText(query);
+  return (
+    normalized === 'product' ||
+    normalized === 'pm' ||
+    normalized.includes('product management') ||
+    normalized.includes('product manager')
+  );
+}
+
+function matchesWorkdayRole(query: string, text: string): boolean {
+  const normalized = normalizeText(text);
+  if (isProductManagementQuery(query)) {
+    return [
+      'product management',
+      'product manager',
+      'associate product manager',
+      'technical product manager',
+      'product strategy',
+      'product roadmap',
+      'product operations',
+      'product intern',
+    ].some((term) => includesNormalizedTerm(normalized, term));
+  }
+
+  return containsRoleSignal(normalized, termsFor(query));
+}
+
+export function workdayJobMatchesSearch(
+  query: string,
+  job: WorkdayJob,
+  detail?: WorkdayJobPostingInfo | null,
+): boolean {
+  const title = detail?.title ?? job.title ?? '';
+  const description = stripHtml(detail?.jobDescription) ?? '';
+  const applyUrl = job.externalPath ?? '';
+  const internshipResult: InternshipSearchResult = {
+    id: 'workday-validation',
+    title,
+    company: 'Workday employer',
+    location: detail?.location ?? job.locationsText ?? 'See posting',
+    description,
+    applyUrl: applyUrl || 'https://example.com/job/workday-listing',
+    postedAt: normalizePostingDate(detail?.startDate ?? job.postedOn),
+    source: 'Company Site',
+  };
+
+  return (
+    hasExplicitInternshipListingSignal(internshipResult) &&
+    matchesWorkdayRole(query, `${title} ${description}`)
+  );
+}
+
+function workdaySearchVariants(query: string): string[] {
+  const roleOnly = query
+    .replace(/\b(internships?|intern|co[\s-]?op|student|university|campus)\b/gi, ' ')
+    .replace(/\b(summer|fall|spring|winter)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return uniqueNormalized([
+    roleOnly,
+    ...queryVariants(roleOnly || query),
+    'intern',
+    'internship',
+    'co-op',
+  ]).slice(0, 6);
+}
+
+function workdayDetailUrl(job: WorkdayJob, entry: CompanyDirectoryEntry): string | null {
+  if (!entry.workday || !job.externalPath) return null;
+  return `https://${entry.workday.host}/wday/cxs/${entry.workday.tenant}/${entry.workday.site}${job.externalPath}`;
+}
+
 async function searchWorkdayCompanyJobs(
   query: string,
   entry: CompanyDirectoryEntry,
+  fullCompanyScan = false,
 ): Promise<InternshipSearchResult[]> {
   if (!entry.workday) return [];
 
@@ -2456,40 +2887,90 @@ async function searchWorkdayCompanyJobs(
     headers: { accept: 'text/html', 'user-agent': 'Mozilla/5.0' },
   }).catch(() => null);
   const cookie = session ? cookieHeader(nodeSetCookieValues(session.headers)) : undefined;
-  const jobs: WorkdayJob[] = [];
-  for (const variant of internshipFocusedQueryVariants(query).slice(0, 5)) {
-    const data = await postWorkdayJson<{ jobPostings?: WorkdayJob[] }>(
-      url,
-      {
-        appliedFacets: {},
-        limit: 20,
-        offset: 0,
-        searchText: normalizeQuery(variant),
-      },
-      cookie,
-      sessionUrl,
-    );
-    jobs.push(...(data?.jobPostings ?? []));
+  const pageCount = fullCompanyScan ? 4 : 2;
+  const searches = workdaySearchVariants(query).flatMap((variant) =>
+    Array.from({ length: pageCount }, (_, page) =>
+      postWorkdayJson<{ jobPostings?: WorkdayJob[] }>(
+        url,
+        {
+          appliedFacets: {},
+          limit: 20,
+          offset: page * 20,
+          searchText: variant,
+        },
+        cookie,
+        sessionUrl,
+      ),
+    ),
+  );
+  const searchResults = await Promise.allSettled(searches);
+  const uniqueJobs = new Map<string, WorkdayJob>();
+  for (const result of searchResults) {
+    if (result.status !== 'fulfilled') continue;
+    for (const job of result.value?.jobPostings ?? []) {
+      const key = job.externalPath ?? `${job.title ?? ''}|${job.locationsText ?? ''}`;
+      if (key) uniqueJobs.set(key, job);
+    }
   }
 
-  return jobs.map((job) => {
-    const title = job.title ?? `${entry.name} internship`;
+  const internshipCandidates = [...uniqueJobs.values()].filter((job) =>
+    hasExplicitInternshipListingSignal({
+      id: 'workday-candidate',
+      title: job.title ?? '',
+      company: entry.name,
+      location: job.locationsText ?? 'See posting',
+      applyUrl: job.externalPath ?? entry.careerUrl,
+      postedAt: normalizePostingDate(job.postedOn),
+      source: 'Company Site',
+    }),
+  );
+  const details = await Promise.allSettled(
+    internshipCandidates.slice(0, fullCompanyScan ? 80 : 40).map((job) => {
+      const detailUrl = workdayDetailUrl(job, entry);
+      return detailUrl
+        ? getWorkdayJson<{ jobPostingInfo?: WorkdayJobPostingInfo }>(detailUrl, cookie, sessionUrl)
+        : Promise.resolve(null);
+    }),
+  );
+
+  return internshipCandidates.flatMap((job, index) => {
+    const detailResult = details[index];
+    const detail =
+      detailResult?.status === 'fulfilled' ? detailResult.value?.jobPostingInfo : undefined;
+    if (!workdayJobMatchesSearch(query, job, detail)) return [];
+
+    const title = detail?.title ?? job.title ?? `${entry.name} internship`;
     const applyUrl = job.externalPath
       ? `https://${entry.workday?.host}/${entry.workday?.site}${job.externalPath}`
       : entry.careerUrl;
-    const location = job.locationsText ?? 'See posting';
+    const location =
+      [detail?.location, ...(detail?.additionalLocations ?? [])].filter(Boolean).join('; ') ||
+      job.locationsText ||
+      'See posting';
+    const description =
+      stripHtml(detail?.jobDescription) ?? job.timeType ?? `Found on ${entry.name}'s careers site.`;
+    const salary = parseSalaryRange(description);
 
-    return {
-      id: stableId('Company Site', job.externalPath ?? title, title, entry.name),
-      title,
-      company: entry.name,
-      location,
-      description: job.timeType,
-      applyUrl,
-      postedAt: parsePostedAt(job.postedOn),
-      modality: inferModality(`${title} ${location}`),
-      source: 'Company Site',
-    };
+    return [
+      {
+        id: stableId(
+          'Company Site',
+          detail?.jobReqId ?? job.externalPath ?? title,
+          title,
+          entry.name,
+        ),
+        title,
+        company: entry.name,
+        location,
+        description,
+        salaryMin: salary.salaryMin,
+        salaryMax: salary.salaryMax,
+        applyUrl,
+        postedAt: normalizePostingDate(detail?.startDate ?? job.postedOn),
+        modality: inferModality(`${title} ${location} ${description}`),
+        source: 'Company Site' as const,
+      },
+    ];
   });
 }
 
@@ -2528,9 +3009,9 @@ async function searchKnownOrDiscoveredWorkdayCompanyJobs(
   query: string,
   entry: CompanyDirectoryEntry,
 ): Promise<InternshipSearchResult[]> {
-  if (entry.workday) return searchWorkdayCompanyJobs(query, entry);
+  if (entry.workday) return searchWorkdayCompanyJobs(query, entry, true);
   const workday = await discoverWorkdayConfig(entry);
-  return workday ? searchWorkdayCompanyJobs(query, { ...entry, workday }) : [];
+  return workday ? searchWorkdayCompanyJobs(query, { ...entry, workday }, true) : [];
 }
 
 function eightfoldApplyUrl(job: EightfoldJob, entry: CompanyDirectoryEntry): string {
@@ -2565,7 +3046,7 @@ function mapEightfoldJob(
     location,
     description,
     applyUrl,
-    postedAt: parseUnixTimestamp(job.postedTs ?? job.creationTs),
+    postedAt: normalizeUnixPostingDate(job.postedTs ?? job.creationTs),
     modality: inferModality(`${title} ${location} ${job.workLocationOption ?? ''}`),
     source: 'Company Site',
   };
@@ -2628,7 +3109,7 @@ async function searchCompanyDirectFeeds(
   const fullCompanyScan = selected.length > 0;
   const tasks = directEntries.flatMap((entry) => [
     ...(matchesCompanyEntry(entry, 'Amazon') ? [searchAmazonCompanyJobs(query, entry)] : []),
-    ...(entry.workday ? [searchWorkdayCompanyJobs(query, entry)] : []),
+    ...(entry.workday ? [searchWorkdayCompanyJobs(query, entry, fullCompanyScan)] : []),
     ...(entry.eightfold ? [searchEightfoldCompanyJobs(query, entry, fullCompanyScan ? 4 : 1)] : []),
     ...(entry.smartRecruiters
       ? [searchSmartRecruitersBoard(entry.smartRecruiters, entry.name, query)]
@@ -2671,11 +3152,12 @@ async function searchCompanySitePages(
     companySiteSeedUrls(entry, query).map(async (pageUrl) => {
       const html = await fetchText(pageUrl);
       if (!html) return [];
+      const isGooglePage = matchesCompanyEntry(entry, 'Google');
       return [
         ...extractGoogleCareerResults(html, pageUrl, entry),
         ...extractEmbeddedCompanyResults(html, entry),
         ...extractStructuredJobResults(html, pageUrl, entry),
-        ...extractCompanySiteResults(html, pageUrl, entry, queryTerms),
+        ...(isGooglePage ? [] : extractCompanySiteResults(html, pageUrl, entry, queryTerms)),
       ];
     }),
   );
@@ -2742,28 +3224,12 @@ async function searchCompanySitemapPages(
       })
       .slice(0, 5);
 
-    const sitemapUrlResults = urls
-      .filter((url) => isSpecificJobUrl(url, entry.careerUrl))
-      .map((url) => {
-        const title = titleFromUrl(url, `${entry.name} internship`);
-        const location = locationFromJobUrl(url) ?? 'See posting';
-        return {
-          id: stableId('Company Site', url, title, entry.name),
-          title,
-          company: entry.name,
-          location,
-          description: `Found on ${entry.name}'s careers site.`,
-          applyUrl: url,
-          postedAt: new Date().toISOString(),
-          modality: inferModality(`${title} ${location}`),
-          source: 'Company Site' as const,
-        };
-      });
-
     const pageResults = await Promise.allSettled(
       urls.map(async (url) => {
         const html = await fetchText(url);
         if (!html) return [];
+        const googleDetail = extractGoogleDetailResult(html, url, entry);
+        if (googleDetail) return [googleDetail];
         return [
           ...extractGoogleCareerResults(html, url, entry),
           ...extractEmbeddedCompanyResults(html, entry),
@@ -2773,10 +3239,7 @@ async function searchCompanySitemapPages(
       }),
     );
 
-    return [
-      ...sitemapUrlResults,
-      ...pageResults.flatMap((result) => (result.status === 'fulfilled' ? result.value : [])),
-    ];
+    return pageResults.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
   });
 
   const settled = await Promise.allSettled(tasks);
@@ -2801,6 +3264,7 @@ export async function searchInternships(options: SearchOptions): Promise<Interns
     ...providerQueries
       .slice(0, 2)
       .map((query) => searchAdzuna(query, options.location, options.company, options.season)),
+    searchTheirStack(effectiveQuery, options.location, options.company),
     searchWebResults(effectiveQuery, options.location, options.company, options.season),
   ]);
 

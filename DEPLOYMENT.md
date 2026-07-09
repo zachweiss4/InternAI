@@ -50,6 +50,7 @@ Recommended:
 ADZUNA_APP_ID=your-adzuna-app-id
 ADZUNA_APP_KEY=your-adzuna-app-key
 SERPAPI_API_KEY=your-serpapi-key
+THEIRSTACK_API_KEY=your-theirstack-api-key
 OPENAI_API_KEY=your-openai-api-key
 BLOB_READ_WRITE_TOKEN=your-vercel-blob-token
 RESEND_API_KEY=your-resend-api-key
@@ -67,6 +68,7 @@ Sensitive variables:
 - `BETTER_AUTH_SECRET`
 - `ADZUNA_APP_KEY`
 - `SERPAPI_API_KEY`
+- `THEIRSTACK_API_KEY`
 - `OPENAI_API_KEY`
 - `BLOB_READ_WRITE_TOKEN`
 - `RESEND_API_KEY`

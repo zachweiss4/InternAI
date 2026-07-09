@@ -22,6 +22,7 @@ import { apiFetch } from '@/lib/api-client';
 import { ApplicationResponse, ApplicationsListResponse } from '@/lib/contracts/applications';
 import { SavedInternshipListResponse } from '@/lib/contracts/saved';
 import { type InternshipResult, SearchResponseSchema } from '@/lib/contracts/search';
+import { formatPostingAge, postingDateTimestamp } from '@/lib/search/result-normalization';
 
 type PaywallReason = 'unauthenticated' | 'quota_exceeded' | null;
 
@@ -231,8 +232,7 @@ function ResultCard({
   const [applying, setApplying] = useState(false);
   const [saving, setSaving] = useState(false);
   const salary = formatSalary(result.salaryMin, result.salaryMax);
-  const daysAgo = Math.floor((Date.now() - new Date(result.postedAt).getTime()) / 86400000);
-  const posted = daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : `${daysAgo}d ago`;
+  const posted = formatPostingAge(result.postedAt);
 
   async function handleApply() {
     setApplying(true);
@@ -446,7 +446,7 @@ export function SearchIsland() {
     if (!results) return results;
     return [...results].sort((a, b) => {
       if (sort === 'newest') {
-        const dateDiff = new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime();
+        const dateDiff = postingDateTimestamp(b.postedAt) - postingDateTimestamp(a.postedAt);
         if (dateDiff !== 0) return dateDiff;
       }
       return (b.matchScore ?? 0) - (a.matchScore ?? 0);

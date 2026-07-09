@@ -23,6 +23,7 @@ export const env = createEnv({
     ADZUNA_APP_ID: z.string().min(1).optional(),
     ADZUNA_APP_KEY: z.string().min(1).optional(),
     SERPAPI_API_KEY: z.string().min(1).optional(),
+    THEIRSTACK_API_KEY: z.string().min(1).optional(),
     BETTER_AUTH_SECRET: z.string().min(1),
     BETTER_AUTH_URL: z
       .string()
@@ -56,6 +57,7 @@ export const env = createEnv({
     ADZUNA_APP_ID: process.env.ADZUNA_APP_ID,
     ADZUNA_APP_KEY: process.env.ADZUNA_APP_KEY,
     SERPAPI_API_KEY: process.env.SERPAPI_API_KEY,
+    THEIRSTACK_API_KEY: process.env.THEIRSTACK_API_KEY,
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     OWNER_EMAIL: process.env.OWNER_EMAIL,

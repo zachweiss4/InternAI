@@ -25,7 +25,7 @@ export const InternshipResultSchema = z.object({
   salaryMax: z.number().optional(),
   modality: z.enum(['remote', 'hybrid', 'on-site']).optional(),
   applyUrl: z.string().url(),
-  postedAt: z.string(),
+  postedAt: z.string().nullable(),
   matchScore: z.number().min(0).max(100).optional(),
   seasonMatch: z.enum(['summer', 'fall']).optional(),
   fitReasons: z.array(z.string()).optional(),
