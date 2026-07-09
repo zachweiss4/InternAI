@@ -33,6 +33,7 @@ const EXAMPLE_QUERIES = [
 ];
 
 const ANY_FILTER = '__any';
+const WORLDWIDE_LOCATION_FILTER = 'Worldwide';
 
 const SEASON_FILTERS = [
   { value: 'summer', label: 'Summer' },
@@ -55,6 +56,7 @@ const ROLE_FILTERS = [
 ];
 
 const LOCATION_FILTERS = [
+  WORLDWIDE_LOCATION_FILTER,
   'Remote',
   'New York',
   'San Francisco',
@@ -437,6 +439,7 @@ export function SearchIsland() {
     company: '',
     season: '',
     profileMatch: false,
+    includeNonUs: false,
   });
   const [paywallReason, setPaywallReason] = useState<PaywallReason>(null);
   const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
@@ -492,6 +495,7 @@ export function SearchIsland() {
       const roleFilter = (filters.role ?? role).trim();
       const keywordQuery = (filters.query ?? query).trim();
       const locationFilter = (filters.location ?? location).trim();
+      const includeNonUs = locationFilter === WORLDWIDE_LOCATION_FILTER;
       const companyFilter = (filters.company ?? company).trim();
       const searchQuery =
         [roleFilter, keywordQuery].filter(Boolean).join(' ') || (companyFilter ? 'internship' : '');
@@ -505,15 +509,17 @@ export function SearchIsland() {
           (companyFilter ? `internships at ${companyFilter}` : searchQuery),
       );
       setActiveFilters({
-        location: locationFilter,
+        location: includeNonUs ? WORLDWIDE_LOCATION_FILTER : locationFilter,
         company: companyFilter,
         season: seasonFilter,
         profileMatch: profileMatchFilter,
+        includeNonUs,
       });
       setPaywallReason(null);
       try {
         const params = new URLSearchParams({ q: searchQuery.trim() });
-        if (locationFilter) params.set('location', locationFilter);
+        if (locationFilter && !includeNonUs) params.set('location', locationFilter);
+        if (includeNonUs) params.set('includeNonUs', 'true');
         if (companyFilter) params.set('company', companyFilter);
         if (seasonFilter) params.set('season', seasonFilter);
         if (profileMatchFilter) params.set('profileMatch', 'true');
@@ -641,10 +647,12 @@ export function SearchIsland() {
               <SelectValue placeholder="Location" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ANY_FILTER}>Any location</SelectItem>
+              <SelectItem value={ANY_FILTER}>Any U.S. location</SelectItem>
               {LOCATION_FILTERS.map((option) => (
                 <SelectItem key={option} value={option}>
-                  {option}
+                  {option === WORLDWIDE_LOCATION_FILTER
+                    ? 'Worldwide (include outside U.S.)'
+                    : option}
                 </SelectItem>
               ))}
             </SelectContent>

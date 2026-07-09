@@ -3,9 +3,12 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 
 let matchesLocationFilter: typeof import('@/lib/search/internships').matchesLocationFilter;
+let matchesSearchLocationPolicy: typeof import('@/lib/search/internships').matchesSearchLocationPolicy;
 
 beforeAll(async () => {
-  ({ matchesLocationFilter } = await import('@/lib/search/internships'));
+  ({ matchesLocationFilter, matchesSearchLocationPolicy } = await import(
+    '@/lib/search/internships'
+  ));
 });
 
 describe('United States location filtering', () => {
@@ -29,5 +32,44 @@ describe('United States location filtering', () => {
   it('keeps state filters strict', () => {
     expect(matchesLocationFilter('Miami, FL', 'Florida', 'on-site')).toBe(true);
     expect(matchesLocationFilter('See posting', 'Florida', 'on-site')).toBe(false);
+  });
+
+  it('defaults broad searches to U.S. safe results', () => {
+    expect(matchesSearchLocationPolicy('Seattle, WA', {}, 'on-site')).toBe(true);
+    expect(matchesSearchLocationPolicy('Remote, United States', {}, 'remote')).toBe(true);
+    expect(matchesSearchLocationPolicy('See posting', {}, 'on-site')).toBe(true);
+    expect(matchesSearchLocationPolicy('Toronto, Canada', {}, 'on-site')).toBe(false);
+    expect(matchesSearchLocationPolicy('London, United Kingdom', {}, 'hybrid')).toBe(false);
+  });
+
+  it('keeps remote searches U.S. safe unless worldwide is selected', () => {
+    expect(matchesSearchLocationPolicy('Remote', { location: 'Remote' }, 'remote')).toBe(true);
+    expect(matchesSearchLocationPolicy('Canada', { location: 'Remote' }, 'remote')).toBe(false);
+    expect(
+      matchesSearchLocationPolicy('Canada', { location: 'Remote', includeNonUs: true }, 'remote'),
+    ).toBe(true);
+  });
+
+  it('allows outside-U.S. results only when selected intentionally', () => {
+    expect(matchesSearchLocationPolicy('Toronto, Canada', { includeNonUs: true }, 'on-site')).toBe(
+      true,
+    );
+    expect(
+      matchesSearchLocationPolicy('London, United Kingdom', { location: 'Worldwide' }, 'hybrid'),
+    ).toBe(true);
+    expect(
+      matchesSearchLocationPolicy('London, United Kingdom', { location: 'London' }, 'hybrid'),
+    ).toBe(true);
+  });
+
+  it('keeps known U.S. city filters U.S. safe', () => {
+    expect(matchesSearchLocationPolicy('Boston, MA', { location: 'Boston' }, 'on-site')).toBe(true);
+    expect(matchesSearchLocationPolicy('Boston', { location: 'Boston' }, 'on-site')).toBe(true);
+    expect(
+      matchesSearchLocationPolicy('Boston, United Kingdom', { location: 'Boston' }, 'on-site'),
+    ).toBe(false);
+    expect(
+      matchesSearchLocationPolicy('Seattle, United Kingdom', { location: 'Seattle' }, 'on-site'),
+    ).toBe(false);
   });
 });

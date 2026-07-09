@@ -10,6 +10,7 @@ export const SearchFiltersSchema = z.object({
   company: z.string().optional(),
   season: z.enum(['summer', 'fall']).optional(),
   profileMatch: z.boolean().optional(),
+  includeNonUs: z.boolean().optional(),
   sort: z.enum(['relevance', 'newest']).optional(),
   salaryMin: z.number().optional(),
   modality: z.enum(['remote', 'hybrid', 'on-site']).optional(),

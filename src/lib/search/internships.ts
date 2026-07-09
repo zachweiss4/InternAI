@@ -59,6 +59,7 @@ export interface SearchOptions {
   profile?: SearchProfile | null;
   sort?: 'relevance' | 'newest';
   limit?: number | null;
+  includeNonUs?: boolean;
 }
 
 interface AdzunaJob {
@@ -445,6 +446,47 @@ const US_STATE_ALIASES: Record<string, string[]> = {
   wyoming: ['wyoming', 'wy'],
   'district of columbia': ['district of columbia', 'washington dc', 'washington d c', 'dc', 'd c'],
 };
+
+const US_CITY_LOCATION_FILTERS = [
+  'atlanta',
+  'austin',
+  'bellevue',
+  'boca raton',
+  'boston',
+  'charlotte',
+  'chicago',
+  'cupertino',
+  'dallas',
+  'denver',
+  'detroit',
+  'durham',
+  'fort lauderdale',
+  'houston',
+  'jersey city',
+  'los angeles',
+  'miami',
+  'minneapolis',
+  'mountain view',
+  'nashville',
+  'new york',
+  'orlando',
+  'palo alto',
+  'philadelphia',
+  'phoenix',
+  'pittsburgh',
+  'portland',
+  'raleigh',
+  'redmond',
+  'salt lake city',
+  'san diego',
+  'san francisco',
+  'san jose',
+  'seattle',
+  'st louis',
+  'tampa',
+  'washington dc',
+  'washington d c',
+];
 
 const BOARD_SEARCH_SITES = [
   'boards.greenhouse.io',
@@ -845,6 +887,18 @@ function isUsLocationFilter(filter: string): boolean {
   );
 }
 
+function isKnownUsCityLocationFilter(filter: string): boolean {
+  const normalizedFilter = normalizeLocationText(filter);
+  return US_CITY_LOCATION_FILTERS.some((city) => normalizeLocationText(city) === normalizedFilter);
+}
+
+function isWorldwideLocationFilter(filter?: string | null): boolean {
+  const normalizedFilter = normalizeLocationText(filter ?? '');
+  return ['worldwide', 'global', 'anywhere', 'international', 'outside us', 'outside u s'].includes(
+    normalizedFilter,
+  );
+}
+
 function stateAliasesForFilter(filter: string): string[] {
   const normalizedFilter = normalizeLocationText(filter);
   for (const aliases of Object.values(US_STATE_ALIASES)) {
@@ -884,6 +938,73 @@ function hasUsStateAbbreviation(location: string): boolean {
   });
 }
 
+function hasUsLocationSignal(location: string): boolean {
+  const normalizedLocation = normalizeLocationText(location);
+  return (
+    US_COUNTRY_ALIASES.some((alias) => containsLocationAlias(normalizedLocation, alias)) ||
+    Object.values(US_STATE_ALIASES)
+      .flat()
+      .filter((alias) => normalizeLocationText(alias).length > 2)
+      .some((alias) => containsLocationAlias(normalizedLocation, alias)) ||
+    hasUsStateAbbreviation(location)
+  );
+}
+
+function hasExplicitNonUsLocationSignal(location: string): boolean {
+  const normalizedLocation = normalizeLocationText(location);
+  const hasExplicitForeignCountry = NON_US_COUNTRY_MARKERS.some((country) =>
+    containsLocationAlias(normalizedLocation, country),
+  );
+  const locationPrefix = location
+    .trim()
+    .toLowerCase()
+    .match(/^([a-z]{2})[-,:]/)?.[1];
+  const hasExplicitForeignCountryCode = Boolean(
+    locationPrefix && NON_US_COUNTRY_CODES.has(locationPrefix),
+  );
+  return hasExplicitForeignCountry || hasExplicitForeignCountryCode;
+}
+
+function isExplicitNonUsLocationRequest(location?: string | null): boolean {
+  if (!location?.trim()) return false;
+  if (isWorldwideLocationFilter(location)) return true;
+  if (normalizeLocationText(location) === 'remote') return false;
+  if (isUsLocationFilter(location)) return false;
+  if (stateAliasesForFilter(location).length > 0) return false;
+  if (isKnownUsCityLocationFilter(location)) return false;
+  if (hasUsLocationSignal(location)) return false;
+  if (hasExplicitNonUsLocationSignal(location)) return true;
+
+  return true;
+}
+
+function shouldApplyDefaultUsLocationPolicy(options: {
+  location?: string | null;
+  includeNonUs?: boolean;
+}): boolean {
+  if (options.includeNonUs) return false;
+  return !isExplicitNonUsLocationRequest(options.location);
+}
+
+function effectiveProviderLocation(options: SearchOptions): string | null | undefined {
+  if (isWorldwideLocationFilter(options.location)) return null;
+  if (shouldApplyDefaultUsLocationPolicy(options)) {
+    return options.location?.trim() || 'United States';
+  }
+  return options.location;
+}
+
+export function matchesSearchLocationPolicy(
+  location: string,
+  options: { location?: string | null; includeNonUs?: boolean },
+  modality?: InternshipSearchResult['modality'],
+): boolean {
+  const requestedLocation = isWorldwideLocationFilter(options.location) ? null : options.location;
+  if (!matchesLocationFilter(location, requestedLocation, modality)) return false;
+  if (!shouldApplyDefaultUsLocationPolicy(options)) return true;
+  return matchesLocationFilter(location, 'United States', modality);
+}
+
 export function matchesLocationFilter(
   location: string,
   filter?: string | null,
@@ -898,26 +1019,8 @@ export function matchesLocationFilter(
     return modality === 'remote' || containsLocationAlias(normalizedLocation, 'remote');
   }
   if (isUsLocationFilter(filter)) {
-    const hasUsSignal =
-      US_COUNTRY_ALIASES.some((alias) => containsLocationAlias(normalizedLocation, alias)) ||
-      Object.values(US_STATE_ALIASES)
-        .flat()
-        .filter((alias) => normalizeLocationText(alias).length > 2)
-        .some((alias) => containsLocationAlias(normalizedLocation, alias)) ||
-      hasUsStateAbbreviation(location);
-    if (hasUsSignal) return true;
-
-    const hasExplicitForeignCountry = NON_US_COUNTRY_MARKERS.some((country) =>
-      containsLocationAlias(normalizedLocation, country),
-    );
-    const locationPrefix = location
-      .trim()
-      .toLowerCase()
-      .match(/^([a-z]{2})[-,:]/)?.[1];
-    const hasExplicitForeignCountryCode = Boolean(
-      locationPrefix && NON_US_COUNTRY_CODES.has(locationPrefix),
-    );
-    if (hasExplicitForeignCountry || hasExplicitForeignCountryCode) return false;
+    if (hasUsLocationSignal(location)) return true;
+    if (hasExplicitNonUsLocationSignal(location)) return false;
     return true;
   }
 
@@ -3414,7 +3517,13 @@ function scoreAndFilterResults(
   return raw
     .filter((result) => result.title && result.company && result.applyUrl)
     .filter((result) => !usesTemporarilyDisabledHost(result))
-    .filter((result) => matchesLocationFilter(result.location, options.location, result.modality))
+    .filter((result) =>
+      matchesSearchLocationPolicy(
+        result.location,
+        { location: options.location, includeNonUs: options.includeNonUs },
+        result.modality,
+      ),
+    )
     .filter((result) => matchesCompanyResult(result, options.company))
     .filter(
       (result) =>
@@ -3446,6 +3555,7 @@ export async function searchInternships(options: SearchOptions): Promise<Interns
   const effectiveQuery = options.query.trim() || 'internship';
   const providerQuery = queryWithSeason(effectiveQuery, options.season);
   const providerQueries = generalQueryVariants(effectiveQuery, options.season);
+  const providerLocation = effectiveProviderLocation(options);
   const queryTerms = termsFor(effectiveQuery);
   const profileSignals = profileSignalsFor(options.profile);
   const profileLocations = profileLocationTerms(options.profile);
@@ -3456,11 +3566,11 @@ export async function searchInternships(options: SearchOptions): Promise<Interns
     searchCompanySitemapPages(providerQuery, options.company),
     ...providerQueries
       .slice(0, 2)
-      .map((query) => searchGoogleJobs(query, options.location, options.company, options.season)),
+      .map((query) => searchGoogleJobs(query, providerLocation, options.company, options.season)),
     ...providerQueries
       .slice(0, 2)
-      .map((query) => searchAdzuna(query, options.location, options.company, options.season)),
-    searchWebResults(effectiveQuery, options.location, options.company, options.season),
+      .map((query) => searchAdzuna(query, providerLocation, options.company, options.season)),
+    searchWebResults(effectiveQuery, providerLocation, options.company, options.season),
   ]);
 
   let raw = settled.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
@@ -3476,7 +3586,7 @@ export async function searchInternships(options: SearchOptions): Promise<Interns
   if (shouldUseTheirStackBoost(effectiveQuery, options.company, scored.length)) {
     const theirStackResults = await searchTheirStack(
       effectiveQuery,
-      options.location,
+      providerLocation,
       options.company,
     );
     if (theirStackResults.length > 0) {

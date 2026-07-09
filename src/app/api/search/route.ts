@@ -8,13 +8,22 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const FREE_DAILY_LIMIT = 3;
+const WORLDWIDE_LOCATION_VALUES = new Set(['worldwide', 'global', 'anywhere']);
+
 function utcDateString(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function isWorldwideLocation(value: string | null): boolean {
+  return Boolean(value && WORLDWIDE_LOCATION_VALUES.has(value.trim().toLowerCase()));
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const location = searchParams.get('location')?.trim() || null;
+  const requestedLocation = searchParams.get('location')?.trim() || null;
+  const includeNonUs =
+    searchParams.get('includeNonUs') === 'true' || isWorldwideLocation(requestedLocation);
+  const location = isWorldwideLocation(requestedLocation) ? null : requestedLocation;
   const company = searchParams.get('company')?.trim() || null;
   const q = searchParams.get('q')?.trim() || (company ? 'internship' : '');
   if (!q && !company) {
@@ -67,7 +76,15 @@ export async function GET(request: Request) {
           },
         })
       : null;
-  const jobs = await searchInternships({ query: q, location, company, season, sort, profile });
+  const jobs = await searchInternships({
+    query: q,
+    location,
+    company,
+    season,
+    sort,
+    profile,
+    includeNonUs,
+  });
 
   if (user && !isPaid) {
     const today = utcDateString();
@@ -86,6 +103,7 @@ export async function GET(request: Request) {
       company: company ?? undefined,
       season: season ?? undefined,
       profileMatch: profileMatch || undefined,
+      includeNonUs: includeNonUs || undefined,
       sort,
       role: q,
       keywords: ['internship', 'student', 'early career'],
