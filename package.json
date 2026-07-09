@@ -5,7 +5,7 @@
   "packageManager": "pnpm@11.0.7",
   "description": "InternAI internship search and application tracker",
   "engines": {
-    "node": ">=20.18.1"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "dev": "next dev",
