@@ -2709,19 +2709,28 @@ async function searchAmazonCompanyJobs(
 
 export function inferEmployerFromUrl(rawUrl: string): string | null {
   try {
-    const hostname = new URL(rawUrl).hostname.replace(/^www\./, '').toLowerCase();
+    const url = new URL(rawUrl);
+    const hostname = url.hostname.replace(/^www\./, '').toLowerCase();
     const configuredCompany = COMPANY_DIRECTORY.find((entry) => {
       if (entry.workday?.host.toLowerCase() === hostname) return true;
       return entry.domains.some((domain) => {
-        const domainHost = domain.split('/')[0]?.toLowerCase();
-        return hostname === domainHost || hostname.endsWith(`.${domainHost}`);
+        const [domainHost = '', ...pathParts] = domain.toLowerCase().split('/');
+        const hostMatches = hostname === domainHost || hostname.endsWith(`.${domainHost}`);
+        if (!hostMatches) return false;
+        const domainPath = `/${pathParts.filter(Boolean).join('/')}`;
+        return domainPath === '/' || url.pathname.toLowerCase().startsWith(domainPath);
       });
     });
     if (configuredCompany) return configuredCompany.name;
 
     const workdayTenant = hostname.match(/^([a-z0-9_-]+)\.wd\d+\.myworkdayjobs\.com$/i)?.[1];
-    if (!workdayTenant) return null;
-    return workdayTenant
+    const sharedBoardTenant =
+      hostname === 'jobs.ashbyhq.com' || hostname === 'jobs.lever.co'
+        ? url.pathname.split('/').filter(Boolean)[0]
+        : null;
+    const tenant = workdayTenant ?? sharedBoardTenant;
+    if (!tenant) return null;
+    return tenant
       .split(/[-_]+/)
       .filter(Boolean)
       .map((part) => `${part[0]?.toUpperCase() ?? ''}${part.slice(1)}`)

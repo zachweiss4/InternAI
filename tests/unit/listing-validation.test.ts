@@ -196,5 +196,10 @@ describe('individual listing validation', () => {
         'https://travelers.wd5.myworkdayjobs.com/en-US/External/job/Product-Intern_R456',
       ),
     ).toBe('Travelers');
+    expect(
+      inferEmployerFromUrl(
+        'https://jobs.ashbyhq.com/sweatpals/be2f5fa7-2542-40e6-873f-778322bb0522',
+      ),
+    ).toBe('Sweatpals');
   });
 });
