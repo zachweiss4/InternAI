@@ -124,7 +124,7 @@ export function SiteNav() {
           aria-label={`${siteName} home`}
           className="mr-4 shrink-0 truncate text-[1.35rem] font-bold tracking-[-0.03em] text-[var(--editorial-ink)]"
         >
-          internai.dev
+          InternAI
         </Link>
 
         {/* Desktop (md+): inline slots with direct links and `menu` dropdowns */}
@@ -261,7 +261,7 @@ export function SiteNav() {
               >
                 <SheetHeader>
                   <SheetTitle className="text-left font-body text-[var(--editorial-ink)]">
-                    internai.dev
+                    InternAI
                   </SheetTitle>
                 </SheetHeader>
                 <nav aria-label="Mobile" className="mt-6 flex flex-col gap-1 overflow-y-auto">
