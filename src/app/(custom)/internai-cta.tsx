@@ -36,10 +36,10 @@ export function InternAICTA() {
             <p className="mt-6 text-sm text-muted-foreground">
               Questions?{' '}
               <a
-                href="mailto:support@internai.app"
+                href="mailto:support@internai.dev"
                 className="underline underline-offset-2 hover:text-foreground transition-colors"
               >
-                support@internai.app
+                support@internai.dev
               </a>
             </p>
           </div>

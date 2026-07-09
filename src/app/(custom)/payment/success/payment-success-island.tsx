@@ -92,10 +92,10 @@ export function PaymentSuccessIsland({ sessionId }: Props) {
         <p className="text-body text-muted-foreground">
           We couldn&apos;t confirm your payment. If you were charged, contact us at{' '}
           <a
-            href="mailto:support@internai.app"
+            href="mailto:support@internai.dev"
             className="underline underline-offset-2 hover:text-foreground"
           >
-            support@internai.app
+            support@internai.dev
           </a>{' '}
           and we&apos;ll sort it out.
         </p>

@@ -144,7 +144,7 @@ export function BillingIsland() {
         <p>
           Questions about billing?{' '}
           <a
-            href="mailto:support@internai.app?subject=Billing%20Question"
+            href="mailto:support@internai.dev?subject=Billing%20Question"
             className="underline underline-offset-2 hover:text-foreground"
           >
             Contact us

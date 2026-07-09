@@ -31,7 +31,7 @@ export const env = createEnv({
       .default(process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'),
     OWNER_EMAIL: z.string().email().optional(),
     RESEND_API_KEY: z.string().min(1).optional(),
-    RESEND_FROM: z.string().min(1).default('InternAI <onboarding@resend.dev>'),
+    RESEND_FROM: z.string().min(1).default('InternAI <support@internai.dev>'),
     STRIPE_SECRET_KEY: z.string().min(1).optional(),
     STRIPE_BASIC_PRICE_ID: z.string().min(1).optional(),
     STRIPE_PREMIUM_PRICE_ID: z.string().min(1).optional(),

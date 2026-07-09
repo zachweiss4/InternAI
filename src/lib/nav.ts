@@ -38,5 +38,5 @@ export const navItems: NavItem[] = [
   { label: 'How It Works', href: '/#how-it-works', group: 'primary', menu: 'About', order: 5 },
   { label: 'Billing', href: '/billing', group: 'secondary', requiresAuth: true },
   { label: 'FAQ', href: '/#faq', group: 'footer' },
-  { label: 'Contact', href: 'mailto:support@internai.app', group: 'footer' },
+  { label: 'Contact', href: 'mailto:support@internai.dev', group: 'footer' },
 ];

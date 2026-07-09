@@ -54,7 +54,7 @@ THEIRSTACK_API_KEY=your-theirstack-api-key
 OPENAI_API_KEY=your-openai-api-key
 BLOB_READ_WRITE_TOKEN=your-vercel-blob-token
 RESEND_API_KEY=your-resend-api-key
-RESEND_FROM=InternAI <onboarding@resend.dev>
+RESEND_FROM=InternAI <support@internai.dev>
 STRIPE_SECRET_KEY=sk_live_or_test_...
 STRIPE_BASIC_PRICE_ID=price_...
 STRIPE_PREMIUM_PRICE_ID=price_...
@@ -100,13 +100,15 @@ STRIPE_PREMIUM_PRICE_ID=
 
 ## 6. Email Setup
 
-For quick testing, Resend can send from:
+For production, send app emails from:
 
 ```env
-RESEND_FROM=InternAI <onboarding@resend.dev>
+RESEND_FROM=InternAI <support@internai.dev>
 ```
 
-For production, verify your own domain in Resend and change `RESEND_FROM` to an address on that domain.
+Verify `internai.dev` in Resend before using this sender in production. Zoho can handle the
+`support@internai.dev` inbox, but Resend still needs its own DNS verification to send app emails
+from that address.
 
 ## 7. Cron Setup
 
