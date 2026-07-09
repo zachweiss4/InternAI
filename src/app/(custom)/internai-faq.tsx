@@ -19,7 +19,7 @@ const FAQS = [
   {
     question: 'How does the resume scoring work?',
     answer:
-      'When you upload your resume, InternAI analyzes your skills, experience, and education. For each job posting, it compares your profile against the role requirements using AI and assigns a match score from 0–100%. This helps you prioritize the opportunities where you have the highest chance of success.',
+      'When you upload your resume, InternAI analyzes your skills, experience, and education. For each job posting, it compares your profile against the role requirements using AI and assigns a match score from 0-100%. This helps you prioritize the opportunities where you have the highest chance of success.',
   },
   {
     question: 'Will my applications look generic?',

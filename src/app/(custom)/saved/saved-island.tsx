@@ -40,7 +40,7 @@ function formatSalary(min?: number, max?: number): string | null {
   if (!min && !max) return null;
   const fmt = (n: number) =>
     n >= 1000 ? `$${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k` : `$${n}`;
-  if (min && max) return `${fmt(min)}–${fmt(max)}/mo`;
+  if (min && max) return `${fmt(min)}-${fmt(max)}/mo`;
   if (min) return `${fmt(min)}+/mo`;
   return max ? `Up to ${fmt(max)}/mo` : null;
 }

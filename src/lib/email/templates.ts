@@ -137,7 +137,7 @@ export function jobAlertEmail(input: {
     .map((j) => {
       const salary =
         j.salaryMin && j.salaryMax
-          ? ` · $${j.salaryMin.toLocaleString()}–$${j.salaryMax.toLocaleString()}`
+          ? ` · $${j.salaryMin.toLocaleString()}-$${j.salaryMax.toLocaleString()}`
           : '';
       return `<li style="margin-bottom:14px;"><a href="${escapeHtml(j.applyUrl)}" style="color:#111111;font-weight:600;text-decoration:underline;">${escapeHtml(j.title)}</a><br><span style="color:#555555;font-size:14px;">${escapeHtml(j.company)} · ${escapeHtml(j.location)}${salary}</span></li>`;
     })
@@ -160,7 +160,7 @@ export function jobAlertEmail(input: {
       `Here are new ${seasonLabel} internships from ${companyLabel} or matching ${fieldLabel} in ${locationLabel}:`,
       ...jobs.map(
         (j) =>
-          `- ${j.title} at ${j.company} (${j.location})${j.salaryMin && j.salaryMax ? ` · $${j.salaryMin.toLocaleString()}–$${j.salaryMax.toLocaleString()}` : ''}: ${j.applyUrl}`,
+          `- ${j.title} at ${j.company} (${j.location})${j.salaryMin && j.salaryMax ? ` · $${j.salaryMin.toLocaleString()}-$${j.salaryMax.toLocaleString()}` : ''}: ${j.applyUrl}`,
       ),
     ],
     cta: { label: 'Search more internships →', url: searchUrl },
