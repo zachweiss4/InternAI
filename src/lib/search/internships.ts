@@ -1571,11 +1571,13 @@ function usesTemporarilyDisabledHost(result: Omit<InternshipSearchResult, 'match
 
 function isRelevantToSearch(
   result: Omit<InternshipSearchResult, 'matchScore'>,
+  query: string,
   queryTerms: string[],
   company?: string | null,
 ): boolean {
   if (queryTerms.length === 0) return true;
   const haystack = `${result.title} ${result.description ?? ''} ${result.company} ${result.location}`;
+  if (isProductManagementQuery(query)) return matchesRequestedRole(query, haystack);
   if (containsRoleSignal(haystack, queryTerms)) return true;
 
   const title = normalizeText(result.title);
@@ -2810,7 +2812,7 @@ function isProductManagementQuery(query: string): boolean {
   );
 }
 
-function matchesWorkdayRole(query: string, text: string): boolean {
+function matchesRequestedRole(query: string, text: string): boolean {
   const normalized = normalizeText(text);
   if (isProductManagementQuery(query)) {
     return [
@@ -2849,7 +2851,7 @@ export function workdayJobMatchesSearch(
 
   return (
     hasExplicitInternshipListingSignal(internshipResult) &&
-    matchesWorkdayRole(query, `${title} ${description}`)
+    matchesRequestedRole(query, `${title} ${description}`)
   );
 }
 
@@ -3276,8 +3278,8 @@ export async function searchInternships(options: SearchOptions): Promise<Interns
     .filter((result) => matchesCompanyResult(result, options.company))
     .filter(
       (result) =>
-        !shouldRequireRoleRelevance(result) ||
-        isRelevantToSearch(result, queryTerms, options.company),
+        (!isProductManagementQuery(effectiveQuery) && !shouldRequireRoleRelevance(result)) ||
+        isRelevantToSearch(result, effectiveQuery, queryTerms, options.company),
     )
     .map((result) => ({
       ...result,
