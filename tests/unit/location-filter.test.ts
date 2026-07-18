@@ -20,6 +20,8 @@ describe('United States location filtering', () => {
   it('keeps ambiguous company-site locations instead of hiding valid U.S. jobs', () => {
     expect(matchesLocationFilter('Mountain View', 'United States', 'on-site')).toBe(true);
     expect(matchesLocationFilter('See posting', 'United States', 'on-site')).toBe(true);
+    expect(matchesLocationFilter('Multiple locations', 'United States', 'on-site')).toBe(true);
+    expect(matchesLocationFilter('Location flexible', 'United States', 'hybrid')).toBe(true);
   });
 
   it('rejects explicitly foreign locations', () => {
@@ -27,6 +29,29 @@ describe('United States location filtering', () => {
     expect(matchesLocationFilter('London, United Kingdom', 'United States', 'on-site')).toBe(false);
     expect(matchesLocationFilter('FR-Paris', 'United States', 'on-site')).toBe(false);
     expect(matchesLocationFilter('Canada', 'United States', 'remote')).toBe(false);
+    expect(matchesLocationFilter('Bangalore, India', 'United States', 'on-site')).toBe(false);
+  });
+
+  it('keeps partially ambiguous foreign-looking locations instead of overblocking', () => {
+    expect(matchesLocationFilter('Remote - Canada', 'United States', 'remote')).toBe(true);
+    expect(matchesLocationFilter('Hybrid - Toronto, Canada', 'United States', 'hybrid')).toBe(true);
+    expect(
+      matchesLocationFilter('Multiple locations: London, United Kingdom', 'United States'),
+    ).toBe(true);
+    expect(matchesLocationFilter('Americas', 'United States', 'on-site')).toBe(true);
+  });
+
+  it('does not treat U.S. cities containing country-name fragments as foreign', () => {
+    expect(matchesLocationFilter('Indianapolis, IN', 'United States', 'on-site')).toBe(true);
+    expect(matchesLocationFilter('Indianapolis', 'United States', 'on-site')).toBe(true);
+    expect(matchesSearchLocationPolicy('Indianapolis, IN', {}, 'on-site')).toBe(true);
+  });
+
+  it('does not treat U.S. state-code prefixes as foreign country codes', () => {
+    expect(matchesLocationFilter('CA - San Francisco', 'United States', 'on-site')).toBe(true);
+    expect(matchesLocationFilter('CO - Denver', 'United States', 'on-site')).toBe(true);
+    expect(matchesLocationFilter('IN - Indianapolis', 'United States', 'on-site')).toBe(true);
+    expect(matchesLocationFilter('GB - London', 'United States', 'on-site')).toBe(false);
   });
 
   it('keeps state filters strict', () => {

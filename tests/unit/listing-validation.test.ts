@@ -12,6 +12,7 @@ let inferEmployerFromUrl: typeof import('@/lib/search/internships').inferEmploye
 let mapBrightDataJob: typeof import('@/lib/search/internships').mapBrightDataJob;
 let mapJSearchJob: typeof import('@/lib/search/internships').mapJSearchJob;
 let mapTheirStackJob: typeof import('@/lib/search/internships').mapTheirStackJob;
+let matchesCompanyResult: typeof import('@/lib/search/internships').matchesCompanyResult;
 let normalizeWorkdayPostedAt: typeof import('@/lib/search/internships').normalizeWorkdayPostedAt;
 let shouldUseTheirStackBoost: typeof import('@/lib/search/internships').shouldUseTheirStackBoost;
 let workdayJobMatchesSearch: typeof import('@/lib/search/internships').workdayJobMatchesSearch;
@@ -27,6 +28,7 @@ beforeAll(async () => {
     mapBrightDataJob,
     mapJSearchJob,
     mapTheirStackJob,
+    matchesCompanyResult,
     normalizeWorkdayPostedAt,
     shouldUseTheirStackBoost,
     workdayJobMatchesSearch,
@@ -217,6 +219,49 @@ describe('individual listing validation', () => {
     });
   });
 
+  it('matches company searches by configured aliases and career domains', () => {
+    expect(
+      matchesCompanyResult(
+        result({
+          company: 'Dell',
+          title: 'Software Engineering Intern',
+          applyUrl: 'https://jobs.dell.com/en/job/software-engineering-intern',
+        }),
+        'Dell Technologies',
+      ),
+    ).toBe(true);
+    expect(
+      matchesCompanyResult(
+        result({
+          company: 'Facebook',
+          title: 'Product Intern',
+          applyUrl: 'https://www.metacareers.com/jobs/123-product-intern',
+        }),
+        'Meta',
+      ),
+    ).toBe(true);
+    expect(
+      matchesCompanyResult(
+        result({
+          company: 'Unknown',
+          title: 'Finance Intern',
+          applyUrl: 'https://jobs.hp.com/us/en/job/finance-intern',
+        }),
+        'HP Inc.',
+      ),
+    ).toBe(true);
+    expect(
+      matchesCompanyResult(
+        result({
+          company: 'Other Company',
+          title: 'Finance Intern',
+          applyUrl: 'https://careers.other.example/jobs/finance-intern',
+        }),
+        'HP Inc.',
+      ),
+    ).toBe(false);
+  });
+
   it('uses TheirStack as a focused boost instead of a broad default source', () => {
     expect(shouldUseTheirStackBoost('internship', null, 0)).toBe(false);
     expect(shouldUseTheirStackBoost('internship', 'Google', 25)).toBe(true);
@@ -254,6 +299,68 @@ describe('individual listing validation', () => {
         },
       ),
     ).toBe(true);
+  });
+
+  it('keeps concise product intern titles even without detailed PM keywords', () => {
+    expect(
+      workdayJobMatchesSearch(
+        'product management',
+        {
+          title: 'Product Intern - Summer 2027',
+          externalPath: '/job/New-York-NY/Product-Intern_R4321',
+        },
+        {
+          jobDescription: 'Join a summer internship program with a product team.',
+        },
+      ),
+    ).toBe(true);
+  });
+
+  it('keeps product analyst internships as product-management adjacent', () => {
+    expect(
+      workdayJobMatchesSearch(
+        'product management',
+        {
+          title: 'Product Analyst Intern',
+          externalPath: '/job/Seattle-WA/Product-Analyst-Intern_R7654',
+        },
+        {
+          jobDescription: 'Analyze customer needs and help improve product decisions.',
+        },
+      ),
+    ).toBe(true);
+  });
+
+  it('handles common product-management typos', () => {
+    expect(
+      workdayJobMatchesSearch(
+        'product managemt',
+        {
+          title: 'Product Management Intern - Summer 2027',
+          externalPath: '/job/New-York-NY/Product-Management-Intern_R1234',
+        },
+        {
+          jobDescription:
+            'Support product strategy, customer research, and roadmap prioritization.',
+        },
+      ),
+    ).toBe(true);
+  });
+
+  it('still rejects non-product internships with generic PM context words', () => {
+    expect(
+      workdayJobMatchesSearch(
+        'product management',
+        {
+          title: 'Software Engineering Intern',
+          externalPath: '/job/Seattle-WA/Software-Engineering-Intern_R2222',
+        },
+        {
+          jobDescription:
+            'Work with stakeholders on requirements and prioritization for engineering systems.',
+        },
+      ),
+    ).toBe(false);
   });
 
   it('does not confuse Workday product-design roles with product management', () => {

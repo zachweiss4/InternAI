@@ -527,6 +527,7 @@ const US_CITY_LOCATION_FILTERS = [
   'durham',
   'fort lauderdale',
   'houston',
+  'indianapolis',
   'jersey city',
   'los angeles',
   'miami',
@@ -552,6 +553,13 @@ const US_CITY_LOCATION_FILTERS = [
   'washington dc',
   'washington d c',
 ];
+
+const US_STATE_CODE_ALIASES = new Set(
+  Object.values(US_STATE_ALIASES)
+    .flat()
+    .map((alias) => normalizeLocationText(alias))
+    .filter((alias) => alias.length === 2),
+);
 
 const BOARD_SEARCH_SITES = [
   'boards.greenhouse.io',
@@ -892,7 +900,7 @@ function normalizeQuery(
   season?: SearchOptions['season'],
 ): string {
   const cleaned = query.replace(/\binternships?\b/gi, '').trim();
-  const seasonTerm = season ? `${season} ` : '';
+  const seasonTerm = season && !normalizeText(cleaned).includes(season) ? `${season} ` : '';
   const companyTerm = company?.trim();
   if (companyTerm) {
     return `${seasonTerm}${cleaned || 'internship'} ${companyTerm} internship`.trim();
@@ -937,13 +945,29 @@ function locationTokens(text: string): Set<string> {
   return new Set(normalizeLocationText(text).split(/\s+/).filter(Boolean));
 }
 
+function orderedLocationTokens(text: string): string[] {
+  return normalizeLocationText(text).split(/\s+/).filter(Boolean);
+}
+
+function containsTokenSequence(tokens: string[], sequence: string[]): boolean {
+  if (sequence.length === 0) return false;
+  if (sequence.length > tokens.length) return false;
+  return tokens.some((_, index) =>
+    sequence.every((token, sequenceIndex) => tokens[index + sequenceIndex] === token),
+  );
+}
+
 function containsLocationAlias(normalizedValue: string, alias: string): boolean {
   const normalizedAlias = normalizeLocationText(alias);
   if (!normalizedAlias) return false;
-  if (normalizedAlias.length <= 2) {
+  const aliasTokens = orderedLocationTokens(normalizedAlias);
+  if (aliasTokens.length === 1 && normalizedAlias.length <= 2) {
     return locationTokens(normalizedValue).has(normalizedAlias);
   }
-  return normalizedValue === normalizedAlias || normalizedValue.includes(normalizedAlias);
+  return (
+    normalizedValue === normalizedAlias ||
+    containsTokenSequence(orderedLocationTokens(normalizedValue), aliasTokens)
+  );
 }
 
 function isUsLocationFilter(filter: string): boolean {
@@ -994,15 +1018,48 @@ function locationAliasesForFilter(filter: string): string[] {
 }
 
 function hasUsStateAbbreviation(location: string): boolean {
-  const stateAbbreviations = Object.values(US_STATE_ALIASES)
-    .flat()
-    .map((alias) => normalizeLocationText(alias))
-    .filter((alias) => alias.length === 2 && alias !== 'in');
+  const stateAbbreviations = [...US_STATE_CODE_ALIASES].filter((alias) => alias !== 'in');
 
   return stateAbbreviations.some((abbr) => {
     const pattern = new RegExp(`(?:^|,\\s*)${abbr}(?:\\s*,|$)`, 'i');
     return pattern.test(location);
   });
+}
+
+function locationPrefixCode(location: string): string | null {
+  return (
+    location
+      .trim()
+      .toLowerCase()
+      .match(/^([a-z]{2})\s*[-,:]/)?.[1] ?? null
+  );
+}
+
+function hasUsStateCodePrefix(location: string): boolean {
+  const prefix = locationPrefixCode(location);
+  return Boolean(prefix && US_STATE_CODE_ALIASES.has(prefix));
+}
+
+function hasAmbiguousLocationSignal(location: string): boolean {
+  const normalizedLocation = normalizeLocationText(location);
+  if (!normalizedLocation) return true;
+  return [
+    'remote',
+    'hybrid',
+    'multiple locations',
+    'multiple offices',
+    'various locations',
+    'various offices',
+    'see posting',
+    'not specified',
+    'location flexible',
+    'flexible location',
+    'anywhere',
+    'global',
+    'worldwide',
+    'north america',
+    'americas',
+  ].some((term) => containsLocationAlias(normalizedLocation, term));
 }
 
 function hasUsLocationSignal(location: string): boolean {
@@ -1013,21 +1070,22 @@ function hasUsLocationSignal(location: string): boolean {
       .flat()
       .filter((alias) => normalizeLocationText(alias).length > 2)
       .some((alias) => containsLocationAlias(normalizedLocation, alias)) ||
-    hasUsStateAbbreviation(location)
+    hasUsStateAbbreviation(location) ||
+    hasUsStateCodePrefix(location)
   );
 }
 
 function hasExplicitNonUsLocationSignal(location: string): boolean {
+  if (hasUsLocationSignal(location) || hasAmbiguousLocationSignal(location)) return false;
   const normalizedLocation = normalizeLocationText(location);
   const hasExplicitForeignCountry = NON_US_COUNTRY_MARKERS.some((country) =>
     containsLocationAlias(normalizedLocation, country),
   );
-  const locationPrefix = location
-    .trim()
-    .toLowerCase()
-    .match(/^([a-z]{2})[-,:]/)?.[1];
+  const locationPrefix = locationPrefixCode(location);
   const hasExplicitForeignCountryCode = Boolean(
-    locationPrefix && NON_US_COUNTRY_CODES.has(locationPrefix),
+    locationPrefix &&
+      NON_US_COUNTRY_CODES.has(locationPrefix) &&
+      !US_STATE_CODE_ALIASES.has(locationPrefix),
   );
   return hasExplicitForeignCountry || hasExplicitForeignCountryCode;
 }
@@ -1190,7 +1248,9 @@ function generalQueryVariants(query: string, season?: SearchOptions['season']): 
   const base = query.trim() || 'internship';
   const seasonal = season ? queryWithSeason(base, season) : '';
   const hasSpecificIntent = termsFor(base).length > 0;
+  const rolePriority = isProductManagementQuery(base) ? productManagementQueryVariants(season) : [];
   return uniqueNormalized([
+    ...rolePriority,
     seasonal,
     base,
     normalizeQuery(base),
@@ -1486,12 +1546,30 @@ function queryVariants(query: string): string[] {
   if (/\bproduct\b|\bpm\b/.test(normalized)) {
     variants.add('product management internship');
     variants.add('product manager internship');
+    variants.add('associate product manager internship');
+    variants.add('apm internship');
+    variants.add('product analyst internship');
+    variants.add('product strategy internship');
+    variants.add('product operations internship');
   }
   if (/\bfinance\b|\bfinancial\b|\binvestment\b/.test(normalized)) {
     variants.add('finance internship');
     variants.add('financial analyst internship');
   }
   return [...variants].filter(Boolean);
+}
+
+function productManagementQueryVariants(season?: SearchOptions['season']): string[] {
+  const seasonPrefix = season ? `${season} ` : '';
+  return [
+    `${seasonPrefix}product management internship`,
+    `${seasonPrefix}product manager internship`,
+    `${seasonPrefix}associate product manager internship`,
+    `${seasonPrefix}apm internship`,
+    `${seasonPrefix}product analyst internship`,
+    `${seasonPrefix}product strategy internship`,
+    `${seasonPrefix}product operations internship`,
+  ];
 }
 
 function internshipFocusedQueryVariants(query: string): string[] {
@@ -1690,7 +1768,7 @@ function scoreResult(
   }
 
   if (matchesLocationFilter(result.location, filters.location, result.modality)) score += 18;
-  if (filters.company && includesNormalizedTerm(company, filters.company)) score += 25;
+  if (filters.company && matchesCompanyResult(result, filters.company)) score += 25;
   if (filters.season && hasSeasonSignal(result, filters.season)) score += 16;
 
   const profileSignals = filters.profileSignals ?? [];
@@ -1786,16 +1864,40 @@ export function isActionablePosting(result: Omit<InternshipSearchResult, 'matchS
   return true;
 }
 
-function matchesCompanyResult(
+function companyEntryMatchesName(entry: CompanyDirectoryEntry, company: string): boolean {
+  const normalizedCompany = normalizeText(company);
+  return companyNames(entry).some((name) => {
+    const normalizedName = normalizeText(name);
+    return normalizedName.includes(normalizedCompany) || normalizedCompany.includes(normalizedName);
+  });
+}
+
+function resultMatchesCompanyEntry(
+  result: Omit<InternshipSearchResult, 'matchScore'>,
+  entry: CompanyDirectoryEntry,
+): boolean {
+  const inferredEmployer = inferEmployerFromUrl(result.applyUrl);
+  if (inferredEmployer && companyEntryMatchesName(entry, inferredEmployer)) return true;
+
+  const haystack = normalizeText(
+    `${result.company} ${result.title} ${result.description ?? ''} ${result.applyUrl}`,
+  );
+  return companyNames(entry).some((name) => includesNormalizedTerm(haystack, name));
+}
+
+export function matchesCompanyResult(
   result: Omit<InternshipSearchResult, 'matchScore'>,
   company?: string | null,
 ): boolean {
   if (!company?.trim()) return true;
+  const selectedEntries = selectedCompanyEntries(company);
+  if (selectedEntries.some((entry) => resultMatchesCompanyEntry(result, entry))) return true;
+
   const normalizedCompany = normalizeText(company);
   const haystack = normalizeText(
     `${result.company} ${result.title} ${result.description ?? ''} ${result.applyUrl}`,
   );
-  return haystack.includes(normalizedCompany);
+  return includesNormalizedTerm(haystack, normalizedCompany);
 }
 
 function usesTemporarilyDisabledHost(result: Omit<InternshipSearchResult, 'matchScore'>): boolean {
@@ -1835,11 +1937,7 @@ function companyNames(entry: CompanyDirectoryEntry): string[] {
 
 function matchesCompanyEntry(entry: CompanyDirectoryEntry, company?: string | null): boolean {
   if (!company) return false;
-  const normalizedCompany = normalizeText(company);
-  return companyNames(entry).some((name) => {
-    const normalizedName = normalizeText(name);
-    return normalizedName.includes(normalizedCompany) || normalizedCompany.includes(normalizedName);
-  });
+  return companyEntryMatchesName(entry, company);
 }
 
 function selectedCompanyEntries(company?: string | null): CompanyDirectoryEntry[] {
@@ -2838,6 +2936,7 @@ async function searchBrightDataGoogleJobs(
           zone,
           url: searchUrl.toString(),
           format: 'json',
+          data_format: 'parsed',
         }),
       }),
     );
@@ -3303,8 +3402,10 @@ function isProductManagementQuery(query: string): boolean {
   return (
     normalized === 'product' ||
     normalized === 'pm' ||
+    normalized === 'product mgmt' ||
     normalized.includes('product management') ||
-    normalized.includes('product manager')
+    normalized.includes('product manager') ||
+    /\bproduct\s+(managemt|mangement|mgmt)\b/.test(normalized)
   );
 }
 
@@ -3330,6 +3431,7 @@ function matchesRequestedRole(query: string, text: string): boolean {
       'product operations',
       'apm intern',
       'apm internship',
+      'apm program',
     ];
     const productManagerTerms = ['product manager'];
     const productManagementContext = [
@@ -3363,9 +3465,22 @@ function matchesRequestedRole(query: string, text: string): boolean {
     const hasProductInternTitle =
       /\bproduct\b.{0,45}\bintern(ship)?\b/.test(normalized) ||
       /\bintern(ship)?\b.{0,45}\bproduct\b/.test(normalized);
+    const hasProductManagementContext = productManagementContext.some((term) =>
+      includesNormalizedTerm(normalized, term),
+    );
+    const hasProductSignal = includesNormalizedTerm(normalized, 'product');
+    const hasProductAnalystTitle =
+      /\bproduct\s+(analyst|strategy|operations|development)\b.{0,45}\bintern(ship)?\b/.test(
+        normalized,
+      ) ||
+      /\bintern(ship)?\b.{0,45}\bproduct\s+(analyst|strategy|operations|development)\b/.test(
+        normalized,
+      );
+
     return (
-      hasProductInternTitle &&
-      productManagementContext.some((term) => includesNormalizedTerm(normalized, term))
+      hasProductInternTitle ||
+      hasProductAnalystTitle ||
+      (hasProductSignal && hasProductManagementContext && hasInternshipSignal(normalized))
     );
   }
 
@@ -3843,20 +3958,29 @@ export async function searchInternships(options: SearchOptions): Promise<Interns
   const effectiveQuery = options.query.trim() || 'internship';
   const providerQuery = queryWithSeason(effectiveQuery, options.season);
   const providerQueries = generalQueryVariants(effectiveQuery, options.season);
+  const primaryProviderQuery = providerQueries[0] ?? providerQuery;
   const providerLocation = effectiveProviderLocation(options);
+  const jSearchQueries = providerQueries.slice(0, isProductManagementQuery(effectiveQuery) ? 3 : 1);
   const queryTerms = termsFor(effectiveQuery);
   const profileSignals = profileSignalsFor(options.profile);
   const profileLocations = profileLocationTerms(options.profile);
   const settled = await Promise.allSettled([
-    searchCompanyDirectFeeds(providerQuery, options.company),
+    searchCompanyDirectFeeds(primaryProviderQuery, options.company),
     searchCompanyBoards(options.company),
-    searchCompanySitePages(providerQuery, options.company),
-    searchCompanySitemapPages(providerQuery, options.company),
+    searchCompanySitePages(primaryProviderQuery, options.company),
+    searchCompanySitemapPages(primaryProviderQuery, options.company),
     ...providerQueries
       .slice(0, 2)
       .map((query) => searchGoogleJobs(query, providerLocation, options.company, options.season)),
-    searchJSearch(providerQuery, providerLocation, options.company, options.season),
-    searchBrightDataGoogleJobs(providerQuery, providerLocation, options.company, options.season),
+    ...jSearchQueries.map((query) =>
+      searchJSearch(query, providerLocation, options.company, options.season),
+    ),
+    searchBrightDataGoogleJobs(
+      primaryProviderQuery,
+      providerLocation,
+      options.company,
+      options.season,
+    ),
     ...providerQueries
       .slice(0, 2)
       .map((query) => searchAdzuna(query, providerLocation, options.company, options.season)),
