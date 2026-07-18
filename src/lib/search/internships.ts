@@ -16,6 +16,8 @@ export type InternshipSource =
   | 'SmartRecruiters'
   | 'Company Site'
   | 'Google Jobs'
+  | 'JSearch'
+  | 'Bright Data'
   | 'TheirStack'
   | 'Web Search';
 
@@ -176,6 +178,69 @@ interface SerpApiJob {
   };
   description?: string;
   job_id?: string;
+}
+
+interface JSearchApplyOption {
+  publisher?: string;
+  apply_link?: string;
+  is_direct?: boolean;
+}
+
+interface JSearchJob {
+  job_id?: string;
+  job_title?: string;
+  employer_name?: string;
+  employer_website?: string;
+  job_publisher?: string;
+  job_employment_type?: string;
+  job_employment_types?: string[];
+  job_apply_link?: string;
+  apply_options?: JSearchApplyOption[];
+  job_description?: string;
+  job_is_remote?: boolean | null;
+  job_posted_at?: string;
+  job_posted_at_timestamp?: number;
+  job_posted_at_datetime_utc?: string;
+  job_location?: string;
+  job_city?: string;
+  job_state?: string;
+  job_country?: string;
+  job_min_salary?: number | null;
+  job_max_salary?: number | null;
+  work_arrangement?: string | null;
+}
+
+interface BrightDataJob {
+  title?: string;
+  job_title?: string;
+  company?: string;
+  company_name?: string;
+  employer_name?: string;
+  location?: string;
+  job_location?: string;
+  link?: string;
+  url?: string;
+  apply_link?: string;
+  job_apply_link?: string;
+  share_link?: string;
+  apply_options?: Array<{ link?: string; apply_link?: string; title?: string; publisher?: string }>;
+  description?: string;
+  snippet?: string;
+  date?: string;
+  posted_at?: string;
+  detected_extensions?: {
+    posted_at?: string;
+    salary?: string;
+  };
+  salary?: string;
+  job_id?: string;
+}
+
+interface BrightDataSerpResponse {
+  jobs?: BrightDataJob[];
+  jobs_results?: BrightDataJob[];
+  organic?: BrightDataJob[];
+  organic_results?: BrightDataJob[];
 }
 
 interface SerpOrganicResult {
@@ -544,6 +609,8 @@ const SOURCE_QUALITY: Record<InternshipSource, number> = {
   SmartRecruiters: 17,
   'Company Site': 19,
   'Google Jobs': 5,
+  JSearch: 6,
+  'Bright Data': 7,
   TheirStack: 18,
   'Web Search': -4,
 };
@@ -2510,6 +2577,131 @@ async function searchAshbyBoard(
   }));
 }
 
+function isTemporarilyDisabledApplyUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+    return TEMPORARILY_DISABLED_RESULT_HOSTS.some(
+      (disabled) => host === disabled || host.endsWith(`.${disabled}`),
+    );
+  } catch {
+    return true;
+  }
+}
+
+function preferredJSearchApplyUrl(job: JSearchJob): string | undefined {
+  const options = [
+    ...(job.apply_options ?? [])
+      .filter((option) => option.apply_link)
+      .sort((a, b) => Number(Boolean(b.is_direct)) - Number(Boolean(a.is_direct)))
+      .map((option) => option.apply_link as string),
+    ...(job.job_apply_link ? [job.job_apply_link] : []),
+  ];
+  return options.find((url) => !isTemporarilyDisabledApplyUrl(url)) ?? options[0];
+}
+
+function jSearchLocation(job: JSearchJob): string {
+  const country = stringValue(job.job_country)?.toUpperCase();
+  const location = stringValue(job.job_location);
+  if (location) {
+    return country &&
+      country !== 'US' &&
+      !normalizeLocationText(location).includes(country.toLowerCase())
+      ? `${location}, ${country}`
+      : location;
+  }
+  const cityState = [job.job_city, job.job_state].map(stringValue).filter(Boolean).join(', ');
+  if (cityState) return country && country !== 'US' ? `${cityState}, ${country}` : cityState;
+  return country ?? 'See posting';
+}
+
+function jSearchPostedAt(job: JSearchJob): string | null {
+  return (
+    normalizePostingDate(job.job_posted_at_datetime_utc) ??
+    normalizeUnixPostingDate(job.job_posted_at_timestamp) ??
+    normalizePostingDate(job.job_posted_at)
+  );
+}
+
+export function mapJSearchJob(job: JSearchJob): InternshipSearchResult | null {
+  const title = stringValue(job.job_title);
+  const company = stringValue(job.employer_name);
+  const applyUrl = preferredJSearchApplyUrl(job);
+  if (!title || !company || !applyUrl) return null;
+
+  const location = jSearchLocation(job);
+  const salaryMin =
+    typeof job.job_min_salary === 'number' && Number.isFinite(job.job_min_salary)
+      ? job.job_min_salary
+      : undefined;
+  const salaryMax =
+    typeof job.job_max_salary === 'number' && Number.isFinite(job.job_max_salary)
+      ? job.job_max_salary
+      : undefined;
+  const arrangement = stringValue(job.work_arrangement);
+  const modality =
+    job.job_is_remote || arrangement === 'remote'
+      ? 'remote'
+      : arrangement === 'hybrid'
+        ? 'hybrid'
+        : inferModality(`${title} ${location} ${job.job_description ?? ''}`);
+
+  return {
+    id: stableId('JSearch', job.job_id ?? applyUrl, title, company),
+    title,
+    company,
+    location,
+    description: stripHtml(
+      [job.job_publisher, job.job_employment_type, job.job_description].filter(Boolean).join(' - '),
+    ),
+    applyUrl,
+    postedAt: jSearchPostedAt(job),
+    salaryMin,
+    salaryMax,
+    modality,
+    source: 'JSearch',
+  };
+}
+
+function brightDataApplyUrl(job: BrightDataJob): string | undefined {
+  const options = [
+    ...(job.apply_options ?? []).flatMap((option) =>
+      [option.apply_link, option.link].filter((url): url is string => Boolean(url)),
+    ),
+    job.job_apply_link,
+    job.apply_link,
+    job.link,
+    job.url,
+    job.share_link,
+  ].filter((url): url is string => Boolean(url));
+  return options.find((url) => !isTemporarilyDisabledApplyUrl(url)) ?? options[0];
+}
+
+export function mapBrightDataJob(job: BrightDataJob): InternshipSearchResult | null {
+  const title = stringValue(job.title) ?? stringValue(job.job_title);
+  const company =
+    stringValue(job.company_name) ?? stringValue(job.employer_name) ?? stringValue(job.company);
+  const applyUrl = brightDataApplyUrl(job);
+  if (!title || !company || !applyUrl) return null;
+
+  const salary = parseSalaryRange(job.detected_extensions?.salary ?? job.salary);
+  const location = stringValue(job.location) ?? stringValue(job.job_location) ?? 'See posting';
+  const description = stripHtml(job.description ?? job.snippet);
+
+  return {
+    id: stableId('Bright Data', job.job_id ?? applyUrl, title, company),
+    title,
+    company,
+    location,
+    description,
+    applyUrl,
+    postedAt: normalizePostingDate(job.detected_extensions?.posted_at ?? job.posted_at ?? job.date),
+    salaryMin: salary.salaryMin,
+    salaryMax: salary.salaryMax,
+    modality: inferModality(`${title} ${location} ${description ?? ''}`),
+    source: 'Bright Data',
+  };
+}
+
 async function searchGoogleJobs(
   query: string,
   location?: string | null,
@@ -2561,6 +2753,102 @@ async function searchGoogleJobs(
       source: 'Google Jobs',
     };
   });
+}
+
+async function searchJSearch(
+  query: string,
+  location?: string | null,
+  company?: string | null,
+  season?: SearchOptions['season'],
+): Promise<InternshipSearchResult[]> {
+  const apiKey = process.env.JSEARCH_API_KEY;
+  if (!apiKey) return [];
+
+  const locationQuery = providerLocationFilter(location) ?? 'United States';
+  const params = new URLSearchParams({
+    query: `${normalizeQuery(query, company, season)} in ${locationQuery}`,
+    country: 'us',
+    language: 'en',
+    date_posted: 'month',
+  });
+  if (normalizeLocationText(location ?? '') === 'remote') {
+    params.set('work_from_home', 'true');
+  }
+
+  try {
+    const response = await withTimeout(
+      fetch(`https://api.openwebninja.com/jsearch/search-v2?${params.toString()}`, {
+        cache: 'force-cache',
+        next: { revalidate: DAILY_REVALIDATE_SECONDS },
+        headers: {
+          accept: 'application/json',
+          'x-api-key': apiKey,
+        },
+      }),
+    );
+    if (!response.ok) return [];
+    const payload = (await response.json()) as { data?: JSearchJob[] };
+    return (payload.data ?? [])
+      .map(mapJSearchJob)
+      .filter((job): job is InternshipSearchResult => Boolean(job));
+  } catch {
+    return [];
+  }
+}
+
+function brightDataJobResults(payload: BrightDataSerpResponse): BrightDataJob[] {
+  return [
+    ...(payload.jobs ?? []),
+    ...(payload.jobs_results ?? []),
+    ...(payload.organic ?? []),
+    ...(payload.organic_results ?? []),
+  ];
+}
+
+async function searchBrightDataGoogleJobs(
+  query: string,
+  location?: string | null,
+  company?: string | null,
+  season?: SearchOptions['season'],
+): Promise<InternshipSearchResult[]> {
+  const apiKey = process.env.BRIGHTDATA_API_KEY;
+  if (!apiKey) return [];
+
+  const locationQuery = providerLocationFilter(location) ?? 'United States';
+  const zone = process.env.BRIGHTDATA_SERP_ZONE || 'serp_api1';
+  const searchUrl = new URL('https://www.google.com/search');
+  searchUrl.searchParams.set('q', `${normalizeQuery(query, company, season)} in ${locationQuery}`);
+  searchUrl.searchParams.set('ibp', 'htl;jobs');
+  searchUrl.searchParams.set('hl', 'en');
+  searchUrl.searchParams.set('gl', 'us');
+  searchUrl.searchParams.set('brd_json', '1');
+
+  try {
+    const response = await withTimeout(
+      fetch('https://api.brightdata.com/request', {
+        method: 'POST',
+        cache: 'force-cache',
+        next: { revalidate: DAILY_REVALIDATE_SECONDS },
+        headers: {
+          accept: 'application/json',
+          authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          zone,
+          url: searchUrl.toString(),
+          format: 'json',
+        }),
+      }),
+    );
+    if (!response.ok) return [];
+    const payload = (await response.json()) as BrightDataSerpResponse;
+    return brightDataJobResults(payload)
+      .map(mapBrightDataJob)
+      .filter((job): job is InternshipSearchResult => Boolean(job));
+  } catch {
+    return [];
+  }
 }
 
 function theirStackCountryCode(location?: string | null): string | null {
@@ -3567,6 +3855,8 @@ export async function searchInternships(options: SearchOptions): Promise<Interns
     ...providerQueries
       .slice(0, 2)
       .map((query) => searchGoogleJobs(query, providerLocation, options.company, options.season)),
+    searchJSearch(providerQuery, providerLocation, options.company, options.season),
+    searchBrightDataGoogleJobs(providerQuery, providerLocation, options.company, options.season),
     ...providerQueries
       .slice(0, 2)
       .map((query) => searchAdzuna(query, providerLocation, options.company, options.season)),

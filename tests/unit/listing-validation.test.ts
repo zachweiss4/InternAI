@@ -9,6 +9,8 @@ let isActionablePosting: typeof import('@/lib/search/internships').isActionableP
 let isStaleInternshipResult: typeof import('@/lib/search/internships').isStaleInternshipResult;
 let isSpecificJobUrl: typeof import('@/lib/search/internships').isSpecificJobUrl;
 let inferEmployerFromUrl: typeof import('@/lib/search/internships').inferEmployerFromUrl;
+let mapBrightDataJob: typeof import('@/lib/search/internships').mapBrightDataJob;
+let mapJSearchJob: typeof import('@/lib/search/internships').mapJSearchJob;
 let mapTheirStackJob: typeof import('@/lib/search/internships').mapTheirStackJob;
 let normalizeWorkdayPostedAt: typeof import('@/lib/search/internships').normalizeWorkdayPostedAt;
 let shouldUseTheirStackBoost: typeof import('@/lib/search/internships').shouldUseTheirStackBoost;
@@ -22,6 +24,8 @@ beforeAll(async () => {
     isActionablePosting,
     isStaleInternshipResult,
     isSpecificJobUrl,
+    mapBrightDataJob,
+    mapJSearchJob,
     mapTheirStackJob,
     normalizeWorkdayPostedAt,
     shouldUseTheirStackBoost,
@@ -141,6 +145,75 @@ describe('individual listing validation', () => {
       applyUrl: 'https://careers.example.com/jobs/123',
       postedAt: '2026-07-01T00:00:00.000Z',
       source: 'TheirStack',
+    });
+  });
+
+  it('maps JSearch records to usable internship results', () => {
+    expect(
+      mapJSearchJob({
+        job_id: 'jsearch-123',
+        job_title: 'Product Management Intern',
+        employer_name: 'Example',
+        job_publisher: 'Example Careers',
+        job_apply_link: 'https://www.indeed.com/viewjob?jk=123',
+        apply_options: [
+          {
+            publisher: 'Indeed',
+            apply_link: 'https://www.indeed.com/viewjob?jk=123',
+            is_direct: false,
+          },
+          {
+            publisher: 'Example Careers',
+            apply_link: 'https://careers.example.com/jobs/product-management-intern',
+            is_direct: true,
+          },
+        ],
+        job_description: 'Join our summer internship program.',
+        job_posted_at_datetime_utc: '2026-07-10T00:00:00.000Z',
+        job_location: 'New York, NY',
+        job_country: 'US',
+        job_min_salary: 22,
+        job_max_salary: 35,
+        work_arrangement: 'hybrid',
+      }),
+    ).toMatchObject({
+      title: 'Product Management Intern',
+      company: 'Example',
+      location: 'New York, NY',
+      applyUrl: 'https://careers.example.com/jobs/product-management-intern',
+      postedAt: '2026-07-10T00:00:00.000Z',
+      modality: 'hybrid',
+      source: 'JSearch',
+    });
+  });
+
+  it('maps Bright Data jobs with parsed salary and posted date', () => {
+    expect(
+      mapBrightDataJob({
+        job_id: 'bright-123',
+        title: 'Software Engineering Intern',
+        company_name: 'Example',
+        location: 'Seattle, WA',
+        apply_options: [
+          {
+            publisher: 'Example Careers',
+            apply_link: 'https://careers.example.com/jobs/swe-intern',
+          },
+        ],
+        description: 'Build software as part of a student internship program.',
+        detected_extensions: {
+          posted_at: '2 days ago',
+          salary: '$25 - $40 an hour',
+        },
+      }),
+    ).toMatchObject({
+      title: 'Software Engineering Intern',
+      company: 'Example',
+      location: 'Seattle, WA',
+      applyUrl: 'https://careers.example.com/jobs/swe-intern',
+      salaryMin: 25,
+      salaryMax: 40,
+      source: 'Bright Data',
     });
   });
 
