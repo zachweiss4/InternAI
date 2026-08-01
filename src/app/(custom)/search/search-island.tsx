@@ -42,6 +42,7 @@ const SEASON_FILTERS = [
 
 const ROLE_FILTERS = [
   'Software Engineering',
+  'Data Analytics',
   'Data Science',
   'Machine Learning',
   'Product Management',

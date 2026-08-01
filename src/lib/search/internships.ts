@@ -308,7 +308,10 @@ const SOURCE_TIMEOUT_MS = 6500;
 const DAILY_REVALIDATE_SECONDS = 24 * 60 * 60;
 const COMPANY_SITE_CRAWL_LIMIT = 24;
 const COMPANY_SITE_SELECTED_LIMIT = 18;
-const MAX_GENERAL_QUERY_VARIANTS = 6;
+const COMPANY_SITE_ROLE_DISCOVERY_LIMIT = 14;
+const COMPANY_SITE_ROLE_DISCOVERY_SEED_LIMIT = 4;
+const MAX_GENERAL_QUERY_VARIANTS = 8;
+const FOCUSED_PROVIDER_QUERY_LIMIT = 3;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const STALE_POSTING_MAX_AGE_DAYS = 180;
 
@@ -625,6 +628,37 @@ const SOURCE_QUALITY: Record<InternshipSource, number> = {
 
 const THEIRSTACK_RESULT_LIMIT = 10;
 const THEIRSTACK_BOOST_RESULT_TARGET = 12;
+const ROLE_DISCOVERY_COMPANY_NAMES = [
+  'Google',
+  'Microsoft',
+  'Amazon',
+  'Apple',
+  'Meta',
+  'Adobe',
+  'Salesforce',
+  'ServiceNow',
+  'Atlassian',
+  'HubSpot',
+  'Intuit',
+  'Databricks',
+  'Stripe',
+  'Capital One',
+  'Robinhood',
+  'Ramp',
+];
+const POSTING_ID_QUERY_PARAMS = new Set([
+  'gh_jid',
+  'jid',
+  'job',
+  'jobid',
+  'job_id',
+  'position',
+  'posting',
+  'req',
+  'reqid',
+  'requisition',
+  'requisitionid',
+]);
 
 const PROFILE_STOP_TERMS = new Set([
   'ability',
@@ -683,6 +717,23 @@ const RESUME_SIGNAL_CATALOG: Array<{
       'backend',
       'data structures',
       'algorithms',
+    ],
+  },
+  {
+    label: 'Data Analytics',
+    kind: 'role',
+    weight: 5,
+    terms: [
+      'data analytics',
+      'data analyst',
+      'business intelligence',
+      'bi analyst',
+      'analytics engineer',
+      'reporting analyst',
+      'dashboard',
+      'tableau',
+      'power bi',
+      'sql',
     ],
   },
   {
@@ -899,13 +950,13 @@ function normalizeQuery(
   company?: string | null,
   season?: SearchOptions['season'],
 ): string {
-  const cleaned = query.replace(/\binternships?\b/gi, '').trim();
+  const cleaned = query.replace(/\b(internships?|interns?|co[\s-]?op)\b/gi, '').trim();
   const seasonTerm = season && !normalizeText(cleaned).includes(season) ? `${season} ` : '';
   const companyTerm = company?.trim();
   if (companyTerm) {
-    return `${seasonTerm}${cleaned || 'internship'} ${companyTerm} internship`.trim();
+    return `${seasonTerm}${cleaned ? `${cleaned} ${companyTerm} internship` : `${companyTerm} internship`}`.trim();
   }
-  return `${seasonTerm}${cleaned || 'software'} internship`.trim();
+  return `${seasonTerm}${cleaned ? `${cleaned} internship` : 'internship'}`.trim();
 }
 
 function normalizeText(text: string): string {
@@ -1165,17 +1216,359 @@ function providerLocationFilter(location?: string | null): string | null {
   return stateName ?? location.trim();
 }
 
+type RoleIntentDefinition = {
+  key: string;
+  triggers: string[];
+  matchTerms: string[];
+  providerQueries: string[];
+};
+
+const ROLE_INTENT_DEFINITIONS: RoleIntentDefinition[] = [
+  {
+    key: 'data analytics',
+    triggers: [
+      'data analytics',
+      'data analyst',
+      'analytics',
+      'business analytics',
+      'business intelligence',
+      'bi analyst',
+      'reporting analyst',
+      'analytics engineer',
+    ],
+    matchTerms: [
+      'data analytics',
+      'data and analytics',
+      'data analyst',
+      'analytics analyst',
+      'analytics intern',
+      'business analytics',
+      'business intelligence',
+      'business intelligence analyst',
+      'bi analyst',
+      'reporting analyst',
+      'insights analyst',
+      'analytics engineer',
+    ],
+    providerQueries: [
+      'data analytics internship',
+      'data and analytics internship',
+      'data analyst internship',
+      'business analytics internship',
+      'business intelligence internship',
+      'analytics internship',
+      'reporting analyst internship',
+    ],
+  },
+  {
+    key: 'data science',
+    triggers: ['data science', 'data scientist', 'statistics', 'statistical modeling'],
+    matchTerms: [
+      'data science',
+      'data scientist',
+      'machine learning',
+      'statistical modeling',
+      'statistics',
+      'research scientist',
+    ],
+    providerQueries: [
+      'data science internship',
+      'data scientist internship',
+      'machine learning data science internship',
+      'statistics internship',
+    ],
+  },
+  {
+    key: 'software engineering',
+    triggers: [
+      'software engineering',
+      'software engineer',
+      'software',
+      'swe',
+      'sde',
+      'developer',
+      'frontend',
+      'backend',
+      'full stack',
+    ],
+    matchTerms: [
+      'software engineering',
+      'software engineer',
+      'software developer',
+      'software development',
+      'swe',
+      'sde',
+      'developer',
+      'frontend',
+      'front end',
+      'backend',
+      'back end',
+      'full stack',
+      'web engineer',
+    ],
+    providerQueries: [
+      'software engineering internship',
+      'software engineer internship',
+      'software development engineer internship',
+      'sde internship',
+      'frontend internship',
+      'backend internship',
+    ],
+  },
+  {
+    key: 'machine learning',
+    triggers: ['machine learning', 'artificial intelligence', 'ai', 'ml', 'deep learning'],
+    matchTerms: [
+      'machine learning',
+      'artificial intelligence',
+      'ai intern',
+      'ml intern',
+      'deep learning',
+      'computer vision',
+      'nlp',
+      'applied scientist',
+      'research scientist',
+    ],
+    providerQueries: [
+      'machine learning internship',
+      'artificial intelligence internship',
+      'ai internship',
+      'ml internship',
+      'applied scientist internship',
+    ],
+  },
+  {
+    key: 'product management',
+    triggers: [
+      'product management',
+      'product manager',
+      'associate product manager',
+      'product mgmt',
+      'product managemt',
+      'product mangement',
+      'pm',
+      'apm',
+    ],
+    matchTerms: [
+      'product management',
+      'product manager',
+      'associate product manager',
+      'technical product manager',
+      'product owner',
+      'product strategy',
+      'product operations',
+      'product analyst',
+      'apm',
+    ],
+    providerQueries: [
+      'product management internship',
+      'product manager internship',
+      'associate product manager internship',
+      'apm internship',
+      'product analyst internship',
+      'product strategy internship',
+      'product operations internship',
+    ],
+  },
+  {
+    key: 'finance',
+    triggers: ['finance', 'financial analyst', 'investment banking', 'accounting', 'wealth'],
+    matchTerms: [
+      'finance',
+      'financial analyst',
+      'investment banking',
+      'summer analyst',
+      'accounting',
+      'audit',
+      'tax',
+      'wealth management',
+      'asset management',
+    ],
+    providerQueries: [
+      'finance internship',
+      'financial analyst internship',
+      'summer analyst internship',
+      'investment banking summer analyst',
+      'accounting internship',
+    ],
+  },
+  {
+    key: 'business analyst',
+    triggers: ['business analyst', 'business analytics', 'strategy analyst'],
+    matchTerms: [
+      'business analyst',
+      'business analytics',
+      'strategy analyst',
+      'operations analyst',
+      'program analyst',
+    ],
+    providerQueries: [
+      'business analyst internship',
+      'business analytics internship',
+      'strategy analyst internship',
+      'operations analyst internship',
+    ],
+  },
+  {
+    key: 'consulting',
+    triggers: ['consulting', 'consultant', 'strategy consulting'],
+    matchTerms: ['consulting', 'consultant', 'strategy consultant', 'business analyst'],
+    providerQueries: ['consulting internship', 'strategy consulting internship'],
+  },
+  {
+    key: 'marketing',
+    triggers: ['marketing', 'growth', 'brand', 'communications'],
+    matchTerms: ['marketing', 'growth', 'brand', 'communications', 'social media'],
+    providerQueries: ['marketing internship', 'growth marketing internship', 'brand internship'],
+  },
+  {
+    key: 'product design',
+    triggers: ['product design', 'ux', 'ui', 'user experience'],
+    matchTerms: ['product design', 'product designer', 'ux', 'ui', 'user experience'],
+    providerQueries: ['product design internship', 'ux internship', 'ui internship'],
+  },
+  {
+    key: 'cybersecurity',
+    triggers: ['cybersecurity', 'cyber security', 'security analyst', 'information security'],
+    matchTerms: ['cybersecurity', 'cyber security', 'security analyst', 'information security'],
+    providerQueries: ['cybersecurity internship', 'security analyst internship'],
+  },
+  {
+    key: 'mechanical engineering',
+    triggers: ['mechanical engineering', 'mechanical', 'manufacturing engineering'],
+    matchTerms: ['mechanical engineering', 'mechanical engineer', 'manufacturing engineering'],
+    providerQueries: ['mechanical engineering internship', 'manufacturing engineering internship'],
+  },
+  {
+    key: 'electrical engineering',
+    triggers: ['electrical engineering', 'electrical', 'embedded systems', 'hardware'],
+    matchTerms: ['electrical engineering', 'electrical engineer', 'embedded systems', 'hardware'],
+    providerQueries: ['electrical engineering internship', 'hardware engineering internship'],
+  },
+  {
+    key: 'biomedical engineering',
+    triggers: ['biomedical engineering', 'biomedical', 'medical device'],
+    matchTerms: ['biomedical engineering', 'biomedical engineer', 'medical device'],
+    providerQueries: ['biomedical engineering internship', 'medical device internship'],
+  },
+  {
+    key: 'research',
+    triggers: ['research', 'researcher', 'research assistant'],
+    matchTerms: ['research', 'researcher', 'research assistant', 'student researcher'],
+    providerQueries: ['research internship', 'student researcher internship'],
+  },
+  {
+    key: 'operations',
+    triggers: ['operations', 'supply chain', 'logistics', 'program management'],
+    matchTerms: ['operations', 'supply chain', 'logistics', 'program management'],
+    providerQueries: ['operations internship', 'supply chain internship', 'logistics internship'],
+  },
+  {
+    key: 'engineering',
+    triggers: ['engineering', 'engineer'],
+    matchTerms: ['engineering', 'engineer'],
+    providerQueries: ['engineering internship'],
+  },
+];
+
+const NON_ROLE_QUERY_TERMS = new Set([
+  'intern',
+  'interns',
+  'internship',
+  'internships',
+  'student',
+  'students',
+  'university',
+  'campus',
+  'early',
+  'career',
+  'careers',
+  'job',
+  'jobs',
+  'summer',
+  'fall',
+  'spring',
+  'winter',
+  'remote',
+  'hybrid',
+  'onsite',
+  'site',
+  'on',
+  'in',
+  'near',
+  'the',
+  'and',
+  'with',
+  'for',
+  'new',
+  'york',
+  'san',
+  'francisco',
+  'los',
+  'angeles',
+  'united',
+  'states',
+  'usa',
+  'us',
+  'month',
+]);
+
+const TOO_BROAD_ROLE_MATCH_TERMS = new Set(['data', 'business', 'management']);
+
+function roleIntentForQuery(query: string): RoleIntentDefinition | null {
+  const normalized = normalizeText(query);
+  if (!normalized || isGenericInternshipQuery(query)) return null;
+  return (
+    ROLE_INTENT_DEFINITIONS.find((intent) =>
+      intent.triggers.some((trigger) => includesNormalizedTerm(normalized, trigger)),
+    ) ?? null
+  );
+}
+
+function isUsableFallbackRoleTerm(term: string): boolean {
+  const normalized = normalizeText(term);
+  return (
+    normalized.length > 2 &&
+    !/^\d+$/.test(normalized) &&
+    !/^20\d{2}$/.test(normalized) &&
+    !NON_ROLE_QUERY_TERMS.has(normalized) &&
+    !TOO_BROAD_ROLE_MATCH_TERMS.has(normalized)
+  );
+}
+
+function roleMatchTermsFor(query: string): string[] {
+  const intent = roleIntentForQuery(query);
+  if (intent) return uniqueNormalized(intent.matchTerms);
+  return uniqueNormalized(termsFor(query).filter(isUsableFallbackRoleTerm));
+}
+
+function isFocusedRoleSearch(query: string): boolean {
+  return roleMatchTermsFor(query).length > 0;
+}
+
 function roleAliases(term: string): string[] {
   const aliases: Record<string, string[]> = {
     swe: ['software engineer', 'software engineering', 'developer', 'programmer'],
+    sde: ['software development engineer', 'software engineer', 'software engineering'],
     software: ['software engineer', 'software engineering', 'developer', 'programmer'],
     frontend: ['front end', 'front-end', 'react', 'web'],
     backend: ['back end', 'back-end', 'server', 'api'],
     fullstack: ['full stack', 'full-stack'],
     ml: ['machine learning', 'ai', 'artificial intelligence'],
     ai: ['machine learning', 'artificial intelligence', 'ml'],
-    data: ['data science', 'data analyst', 'analytics'],
+    data: ['data science', 'data analytics', 'data analyst', 'analytics', 'business intelligence'],
+    analytics: [
+      'data analytics',
+      'data and analytics',
+      'data analyst',
+      'business analytics',
+      'business intelligence',
+      'analytics engineer',
+    ],
+    bi: ['business intelligence', 'data analytics', 'data analyst'],
     product: ['product manager', 'product management', 'pm'],
+    pm: ['product manager', 'product management', 'associate product manager'],
+    apm: ['associate product manager', 'product management'],
     marketing: ['growth', 'social media', 'brand', 'communications'],
     finance: ['financial analyst', 'investment', 'accounting'],
     design: ['product design', 'ux', 'ui'],
@@ -1221,7 +1614,7 @@ export function shouldUseTheirStackBoost(
 ): boolean {
   if (company?.trim()) return true;
   if (isGenericInternshipQuery(query)) return false;
-  if (termsFor(query).length === 0) return false;
+  if (!isFocusedRoleSearch(query)) return false;
   return preliminaryResultCount < THEIRSTACK_BOOST_RESULT_TARGET;
 }
 
@@ -1247,11 +1640,12 @@ function uniqueNormalized(values: string[]): string[] {
 function generalQueryVariants(query: string, season?: SearchOptions['season']): string[] {
   const base = query.trim() || 'internship';
   const seasonal = season ? queryWithSeason(base, season) : '';
-  const hasSpecificIntent = termsFor(base).length > 0;
-  const rolePriority = isProductManagementQuery(base) ? productManagementQueryVariants(season) : [];
+  const hasSpecificIntent = isFocusedRoleSearch(base);
+  const rolePriority = rolePriorityQueryVariants(base, season);
   return uniqueNormalized([
     ...rolePriority,
     seasonal,
+    normalizeQuery(base, null, season),
     base,
     normalizeQuery(base),
     ...queryVariants(base),
@@ -1525,7 +1919,7 @@ function containsRoleSignal(text: string, queryTerms: string[]): boolean {
 
 function queryVariants(query: string): string[] {
   const normalized = normalizeText(query);
-  const hasSpecificIntent = termsFor(query).length > 0;
+  const hasSpecificIntent = isFocusedRoleSearch(query);
   const variants = new Set<string>([query, normalizeQuery(query)]);
   if (!hasSpecificIntent) variants.add('internship');
   if (/\bswe\b|\bsoftware\b|\bengineer(ing)?\b|\bdeveloper\b/.test(normalized)) {
@@ -1535,9 +1929,14 @@ function queryVariants(query: string): string[] {
     variants.add('sde internship');
   }
   if (/\bdata\b|\banalytics?\b/.test(normalized)) {
+    variants.add('data analytics internship');
+    variants.add('data and analytics internship');
     variants.add('data science internship');
     variants.add('data analyst internship');
+    variants.add('business analytics internship');
+    variants.add('business intelligence internship');
     variants.add('analytics internship');
+    variants.add('reporting analyst internship');
   }
   if (/\bai\b|\bml\b|\bmachine learning\b/.test(normalized)) {
     variants.add('machine learning internship');
@@ -1559,6 +1958,21 @@ function queryVariants(query: string): string[] {
   return [...variants].filter(Boolean);
 }
 
+function seasonallyPrioritizedVariants(
+  queries: string[],
+  season?: SearchOptions['season'],
+): string[] {
+  const clean = uniqueNormalized(queries);
+  if (!season) return clean;
+  return uniqueNormalized([...clean.map((query) => queryWithSeason(query, season)), ...clean]);
+}
+
+function rolePriorityQueryVariants(query: string, season?: SearchOptions['season']): string[] {
+  if (isProductManagementQuery(query)) return productManagementQueryVariants(season);
+  const intent = roleIntentForQuery(query);
+  return intent ? seasonallyPrioritizedVariants(intent.providerQueries, season) : [];
+}
+
 function productManagementQueryVariants(season?: SearchOptions['season']): string[] {
   const seasonPrefix = season ? `${season} ` : '';
   return [
@@ -1570,6 +1984,11 @@ function productManagementQueryVariants(season?: SearchOptions['season']): strin
     `${seasonPrefix}product strategy internship`,
     `${seasonPrefix}product operations internship`,
   ];
+}
+
+function providerQueryLimit(query: string, company?: string | null): number {
+  if (!isFocusedRoleSearch(query)) return 1;
+  return company?.trim() ? 2 : FOCUSED_PROVIDER_QUERY_LIMIT;
 }
 
 function internshipFocusedQueryVariants(query: string): string[] {
@@ -1914,7 +2333,8 @@ function isRelevantToSearch(
   if (queryTerms.length === 0) return true;
   const haystack = `${result.title} ${result.description ?? ''} ${result.company} ${result.location}`;
   if (isProductManagementQuery(query)) return matchesRequestedRole(query, haystack);
-  if (containsRoleSignal(haystack, queryTerms)) return true;
+  const roleTerms = roleMatchTermsFor(query);
+  if (roleTerms.length === 0 || containsRoleSignal(haystack, roleTerms)) return true;
 
   const title = normalizeText(result.title);
   const isGenericInternship =
@@ -1943,6 +2363,20 @@ function matchesCompanyEntry(entry: CompanyDirectoryEntry, company?: string | nu
 function selectedCompanyEntries(company?: string | null): CompanyDirectoryEntry[] {
   if (!company) return [];
   return COMPANY_DIRECTORY.filter((entry) => matchesCompanyEntry(entry, company));
+}
+
+function companyEntriesForRoleDiscovery(query: string): CompanyDirectoryEntry[] {
+  if (!isFocusedRoleSearch(query)) return [];
+  const seen = new Set<string>();
+  const entries: CompanyDirectoryEntry[] = [];
+  for (const name of ROLE_DISCOVERY_COMPANY_NAMES) {
+    for (const entry of selectedCompanyEntries(name)) {
+      if (seen.has(entry.name)) continue;
+      seen.add(entry.name);
+      entries.push(entry);
+    }
+  }
+  return entries.slice(0, COMPANY_SITE_ROLE_DISCOVERY_LIMIT);
 }
 
 function toAbsoluteUrl(href: string, baseUrl: string): string | null {
@@ -2010,9 +2444,7 @@ function isLikelyIndividualPostingUrl(url: URL): boolean {
     'search-results',
   ]);
 
-  if (
-    /[?&](job|jobId|job_id|gh_jid|req|reqId|requisition|posting|position)=([^&]+)/i.test(url.search)
-  ) {
+  if (postingIdentifierQuery(url)) {
     return true;
   }
 
@@ -2075,8 +2507,12 @@ export function isSpecificJobUrl(url: string, careerUrl: string): boolean {
   }
 }
 
-function companySiteSeedUrls(entry: CompanyDirectoryEntry, query: string): string[] {
-  const role = query.replace(/\binternships?\b/gi, '').trim() || 'internship';
+function companySiteSeedUrls(
+  entry: CompanyDirectoryEntry,
+  query: string,
+  limit = COMPANY_SITE_SELECTED_LIMIT,
+): string[] {
+  const role = stripSearchDecorators(query) || 'internship';
   const url = new URL(entry.careerUrl);
   const seeds = new Set<string>();
   const basePath = url.pathname.replace(/\/?$/, '/');
@@ -2114,7 +2550,7 @@ function companySiteSeedUrls(entry: CompanyDirectoryEntry, query: string): strin
   seeds.add(`${url.origin}${url.pathname.replace(/\/?$/, '/')}jobs?keyword=internship`);
   seeds.add(`${url.origin}${url.pathname.replace(/\/?$/, '/')}search?keyword=internship`);
   seeds.add(entry.careerUrl);
-  return [...seeds].slice(0, COMPANY_SITE_SELECTED_LIMIT);
+  return [...seeds].slice(0, limit);
 }
 
 function extractBalancedJson(input: string, valueStart: number): string | null {
@@ -2510,7 +2946,18 @@ function stableId(
     .replace(/[^a-z0-9]+/g, '-')}`;
 }
 
-function canonicalPostingUrl(rawUrl: string): string | null {
+function postingIdentifierQuery(url: URL): string | null {
+  for (const [key, value] of url.searchParams.entries()) {
+    const normalizedKey = key.toLowerCase();
+    const normalizedValue = value.trim().toLowerCase();
+    if (POSTING_ID_QUERY_PARAMS.has(normalizedKey) && normalizedValue) {
+      return `${normalizedKey}=${encodeURIComponent(normalizedValue)}`;
+    }
+  }
+  return null;
+}
+
+export function canonicalPostingUrl(rawUrl: string): string | null {
   try {
     const url = new URL(rawUrl);
     const isWorkday = /(?:^|\.)myworkdayjobs\.com$/i.test(url.hostname);
@@ -2518,7 +2965,10 @@ function canonicalPostingUrl(rawUrl: string): string | null {
       ? url.pathname.replace(/^\/[a-z]{2}-[a-z]{2}\//i, '/')
       : url.pathname;
     const pathname = normalizedPath.replace(/\/+$/, '') || '/';
-    return `${url.hostname.replace(/^www\./, '').toLowerCase()}${pathname.toLowerCase()}`;
+    const postingIdentifier = postingIdentifierQuery(url);
+    return `${url.hostname.replace(/^www\./, '').toLowerCase()}${pathname.toLowerCase()}${
+      postingIdentifier ? `?${postingIdentifier}` : ''
+    }`;
   } catch {
     return null;
   }
@@ -2956,6 +3406,28 @@ function theirStackCountryCode(location?: string | null): string | null {
   return null;
 }
 
+function stripSearchDecorators(query: string): string {
+  return query
+    .replace(/\b(internships?|interns?|co[\s-]?op|student|university|campus)\b/gi, ' ')
+    .replace(/\b(summer|fall|spring|winter)\b/gi, ' ')
+    .replace(/\b20\d{2}\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function theirStackTitleTerms(query: string): string[] {
+  if (!isFocusedRoleSearch(query)) return [];
+  return uniqueNormalized([
+    ...rolePriorityQueryVariants(query),
+    ...queryVariants(query),
+    ...roleMatchTermsFor(query),
+    stripSearchDecorators(query),
+  ])
+    .map(stripSearchDecorators)
+    .filter((term) => term && !isGenericInternshipQuery(term))
+    .slice(0, 8);
+}
+
 export function mapTheirStackJob(job: TheirStackJob): InternshipSearchResult | null {
   const title = stringValue(job.job_title);
   const company = stringValue(job.company);
@@ -3001,7 +3473,7 @@ async function searchTheirStack(
   const apiKey = process.env.THEIRSTACK_API_KEY;
   if (!apiKey) return [];
 
-  const role = query.replace(/\b(internships?|interns?|co[\s-]?op)\b/gi, ' ').trim();
+  const roleTerms = theirStackTitleTerms(query);
   const countryCode = theirStackCountryCode(location);
   const body: Record<string, unknown> = {
     posted_at_max_age_days: 45,
@@ -3014,7 +3486,7 @@ async function searchTheirStack(
     limit: THEIRSTACK_RESULT_LIMIT,
     page: 0,
   };
-  if (role) body.job_title_or = [role];
+  if (roleTerms.length > 0) body.job_title_or = roleTerms;
   if (company?.trim()) body.company_name_partial_match_or = [company.trim()];
   if (countryCode) body.job_country_code_or = [countryCode];
   if (normalizeLocationText(location ?? '') === 'remote') body.remote = true;
@@ -3051,7 +3523,7 @@ async function searchWebResults(
 ): Promise<InternshipSearchResult[]> {
   if (!process.env.SERPAPI_API_KEY) return [];
 
-  const queryTerms = termsFor(query);
+  const queryTerms = roleMatchTermsFor(query);
   const selected = selectedCompanyEntries(company);
   const sites =
     selected.length > 0 ? selected.flatMap((entry) => entry.domains) : BOARD_SEARCH_SITES;
@@ -3484,7 +3956,8 @@ function matchesRequestedRole(query: string, text: string): boolean {
     );
   }
 
-  return containsRoleSignal(normalized, termsFor(query));
+  const roleTerms = roleMatchTermsFor(query);
+  return roleTerms.length === 0 || containsRoleSignal(normalized, roleTerms);
 }
 
 export function normalizeWorkdayPostedAt(job: { postedOn?: string }): string | null {
@@ -3517,19 +3990,16 @@ export function workdayJobMatchesSearch(
 }
 
 function workdaySearchVariants(query: string): string[] {
-  const roleOnly = query
-    .replace(/\b(internships?|intern|co[\s-]?op|student|university|campus)\b/gi, ' ')
-    .replace(/\b(summer|fall|spring|winter)\b/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const roleOnly = stripSearchDecorators(query);
 
   return uniqueNormalized([
     roleOnly,
+    ...rolePriorityQueryVariants(roleOnly || query),
     ...queryVariants(roleOnly || query),
     'intern',
     'internship',
     'co-op',
-  ]).slice(0, 6);
+  ]).slice(0, 8);
 }
 
 function workdayDetailUrl(job: WorkdayJob, entry: CompanyDirectoryEntry): string | null {
@@ -3804,15 +4274,19 @@ async function searchCompanySitePages(
   query: string,
   company?: string | null,
 ): Promise<InternshipSearchResult[]> {
-  const queryTerms = termsFor(query);
+  const queryTerms = roleMatchTermsFor(query);
   const selected = selectedCompanyEntries(company);
-  if (selected.length === 0) return [];
-  const pool = (selected.length > 0 ? selected : COMPANY_DIRECTORY).slice(
-    0,
-    COMPANY_SITE_CRAWL_LIMIT,
-  );
+  const pool =
+    selected.length > 0
+      ? selected.slice(0, COMPANY_SITE_CRAWL_LIMIT)
+      : company?.trim()
+        ? []
+        : companyEntriesForRoleDiscovery(query);
+  if (pool.length === 0) return [];
+  const seedLimit =
+    selected.length > 0 ? COMPANY_SITE_SELECTED_LIMIT : COMPANY_SITE_ROLE_DISCOVERY_SEED_LIMIT;
   const tasks = pool.flatMap((entry) =>
-    companySiteSeedUrls(entry, query).map(async (pageUrl) => {
+    companySiteSeedUrls(entry, query, seedLimit).map(async (pageUrl) => {
       const html = await fetchText(pageUrl);
       if (!html) return [];
       const isGooglePage = matchesCompanyEntry(entry, 'Google');
@@ -3874,7 +4348,7 @@ async function searchCompanySitemapPages(
   const selected = selectedCompanyEntries(company);
   if (selected.length === 0) return [];
 
-  const queryTerms = termsFor(query);
+  const queryTerms = roleMatchTermsFor(query);
   const tasks = selected.flatMap(async (entry) => {
     const locs = (
       await Promise.allSettled(companySitemapOrigins(entry).map((origin) => sitemapLocs(origin)))
@@ -3930,7 +4404,7 @@ function scoreAndFilterResults(
     .filter((result) => matchesCompanyResult(result, options.company))
     .filter(
       (result) =>
-        (!isProductManagementQuery(effectiveQuery) && !shouldRequireRoleRelevance(result)) ||
+        (!isFocusedRoleSearch(effectiveQuery) && !shouldRequireRoleRelevance(result)) ||
         isRelevantToSearch(result, effectiveQuery, queryTerms, options.company),
     )
     .map((result) => ({
@@ -3960,7 +4434,10 @@ export async function searchInternships(options: SearchOptions): Promise<Interns
   const providerQueries = generalQueryVariants(effectiveQuery, options.season);
   const primaryProviderQuery = providerQueries[0] ?? providerQuery;
   const providerLocation = effectiveProviderLocation(options);
-  const jSearchQueries = providerQueries.slice(0, isProductManagementQuery(effectiveQuery) ? 3 : 1);
+  const jSearchQueries = providerQueries.slice(
+    0,
+    providerQueryLimit(effectiveQuery, options.company),
+  );
   const queryTerms = termsFor(effectiveQuery);
   const profileSignals = profileSignalsFor(options.profile);
   const profileLocations = profileLocationTerms(options.profile);

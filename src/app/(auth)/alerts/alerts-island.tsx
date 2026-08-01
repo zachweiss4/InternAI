@@ -2,7 +2,7 @@
 
 import { Bell, Edit3, Plus, Save, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { type Dispatch, type SetStateAction, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,14 +22,15 @@ import {
   AlertResponse,
   type AlertResponseType,
   type AlertSeasonType,
-  type AlertTimeframeType,
   AlertsListResponse,
+  type AlertTimeframeType,
 } from '@/lib/contracts/alerts';
 
 const ANY_FILTER = '__any';
 
 const FIELDS = [
   'Software Engineering',
+  'Data Analytics',
   'Data Science',
   'AI / Machine Learning',
   'Cybersecurity',

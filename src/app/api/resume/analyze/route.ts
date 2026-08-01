@@ -12,19 +12,31 @@ const AnalyzeResumeRequest = z.object({
 });
 
 const SKILL_ROLE_MAP = [
-  { terms: ['react', 'javascript', 'typescript', 'frontend', 'front end'], role: 'Frontend Engineering Internship' },
-  { terms: ['python', 'pandas', 'sql', 'tableau', 'statistics'], role: 'Data Science Internship' },
-  { terms: ['machine learning', 'tensorflow', 'pytorch', 'nlp', 'computer vision'], role: 'Machine Learning Internship' },
+  {
+    terms: ['react', 'javascript', 'typescript', 'frontend', 'front end'],
+    role: 'Frontend Engineering Internship',
+  },
+  {
+    terms: ['sql', 'tableau', 'power bi', 'analytics', 'dashboard'],
+    role: 'Data Analytics Internship',
+  },
+  { terms: ['python', 'pandas', 'statistics', 'data science'], role: 'Data Science Internship' },
+  {
+    terms: ['machine learning', 'tensorflow', 'pytorch', 'nlp', 'computer vision'],
+    role: 'Machine Learning Internship',
+  },
   { terms: ['figma', 'ux', 'ui', 'design', 'prototype'], role: 'Product Design Internship' },
   { terms: ['marketing', 'social media', 'seo', 'content', 'brand'], role: 'Marketing Internship' },
-  { terms: ['finance', 'excel', 'valuation', 'accounting', 'investment'], role: 'Finance Internship' },
-  { terms: ['cad', 'solidworks', 'mechanical', 'manufacturing'], role: 'Mechanical Engineering Internship' },
+  {
+    terms: ['finance', 'excel', 'valuation', 'accounting', 'investment'],
+    role: 'Finance Internship',
+  },
+  {
+    terms: ['cad', 'solidworks', 'mechanical', 'manufacturing'],
+    role: 'Mechanical Engineering Internship',
+  },
   { terms: ['cybersecurity', 'security', 'network', 'linux'], role: 'Cybersecurity Internship' },
 ];
-
-function words(text: string) {
-  return text.toLowerCase().match(/[a-z0-9+#.]+/g) ?? [];
-}
 
 function hasMetric(text: string) {
   return /(\d+%|\$\d+|\d+\+|\d+x|\b\d{2,}\b)/.test(text);
@@ -34,12 +46,15 @@ function bulletLines(text: string) {
   return text
     .split(/\n+/)
     .map((line) => line.trim())
-    .filter((line) => /^[-*•]|\b(developed|built|created|led|managed|designed|implemented|analyzed|improved)\b/i.test(line));
+    .filter((line) =>
+      /^[-*•]|\b(developed|built|created|led|managed|designed|implemented|analyzed|improved)\b/i.test(
+        line,
+      ),
+    );
 }
 
 function localAnalyze(resumeText: string) {
   const normalized = resumeText.toLowerCase();
-  const tokens = words(resumeText);
   const bullets = bulletLines(resumeText);
   const hasEducation = /education|university|college|bachelor|major|gpa/.test(normalized);
   const hasExperience = /experience|intern|project|work|research/.test(normalized);
@@ -69,14 +84,23 @@ function localAnalyze(resumeText: string) {
   ].filter(Boolean);
 
   const improvements = [
-    !metrics ? 'Add measurable outcomes, such as percentages, dollar impact, users served, speed improvements, or project scale.' : '',
-    actionBullets.length < 3 ? 'Rewrite more bullets to start with strong action verbs and end with impact.' : '',
-    !hasSkills ? 'Add a dedicated Skills section with tools, languages, frameworks, and domain skills.' : '',
-    !hasExperience ? 'Add projects, coursework, research, internships, or leadership experience relevant to your target roles.' : '',
+    !metrics
+      ? 'Add measurable outcomes, such as percentages, dollar impact, users served, speed improvements, or project scale.'
+      : '',
+    actionBullets.length < 3
+      ? 'Rewrite more bullets to start with strong action verbs and end with impact.'
+      : '',
+    !hasSkills
+      ? 'Add a dedicated Skills section with tools, languages, frameworks, and domain skills.'
+      : '',
+    !hasExperience
+      ? 'Add projects, coursework, research, internships, or leadership experience relevant to your target roles.'
+      : '',
     'Tailor the top 3-5 bullets to the role you are applying for, using keywords from the internship posting.',
   ].filter(Boolean);
 
-  const firstWeakBullet = bullets.find((line) => !hasMetric(line)) ?? 'Worked on a project for class.';
+  const firstWeakBullet =
+    bullets.find((line) => !hasMetric(line)) ?? 'Worked on a project for class.';
   const roleMatches = SKILL_ROLE_MAP.filter((item) =>
     item.terms.some((term) => normalized.includes(term)),
   ).slice(0, 4);
@@ -107,7 +131,8 @@ function localAnalyze(resumeText: string) {
       {
         before: firstWeakBullet,
         after: `Built or improved [project/process] using [tools], resulting in [measurable outcome] for [users/team/class].`,
-        reason: 'This format makes the action, tools, and impact obvious to recruiters and ATS systems.',
+        reason:
+          'This format makes the action, tools, and impact obvious to recruiters and ATS systems.',
       },
     ],
     recommendedSearches,

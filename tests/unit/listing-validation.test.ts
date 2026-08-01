@@ -3,6 +3,7 @@ import type { InternshipSearchResult } from '@/lib/search/internships';
 
 vi.mock('server-only', () => ({}));
 
+let canonicalPostingUrl: typeof import('@/lib/search/internships').canonicalPostingUrl;
 let hasExplicitInternshipListingSignal: typeof import('@/lib/search/internships').hasExplicitInternshipListingSignal;
 let extractGoogleDetailResult: typeof import('@/lib/search/internships').extractGoogleDetailResult;
 let isActionablePosting: typeof import('@/lib/search/internships').isActionablePosting;
@@ -19,6 +20,7 @@ let workdayJobMatchesSearch: typeof import('@/lib/search/internships').workdayJo
 
 beforeAll(async () => {
   ({
+    canonicalPostingUrl,
     extractGoogleDetailResult,
     hasExplicitInternshipListingSignal,
     inferEmployerFromUrl,
@@ -87,6 +89,22 @@ describe('individual listing validation', () => {
         'https://www.google.com/about/careers/applications/',
       ),
     ).toBe(true);
+  });
+
+  it('keeps real job-id query parameters when deduping career URLs', () => {
+    expect(
+      canonicalPostingUrl(
+        'https://databricks.com/company/careers/open-positions/job?gh_jid=6883068002',
+      ),
+    ).toBe('databricks.com/company/careers/open-positions/job?gh_jid=6883068002');
+    expect(
+      canonicalPostingUrl(
+        'https://databricks.com/company/careers/open-positions/job?gh_jid=7011263002',
+      ),
+    ).toBe('databricks.com/company/careers/open-positions/job?gh_jid=7011263002');
+    expect(canonicalPostingUrl('https://careers.example.com/jobs/search?q=internship')).toBe(
+      'careers.example.com/jobs/search',
+    );
   });
 
   it('rejects a career search page even if its title mentions internships', () => {
@@ -264,6 +282,8 @@ describe('individual listing validation', () => {
 
   it('uses TheirStack as a focused boost instead of a broad default source', () => {
     expect(shouldUseTheirStackBoost('internship', null, 0)).toBe(false);
+    expect(shouldUseTheirStackBoost('summer 2027', null, 0)).toBe(false);
+    expect(shouldUseTheirStackBoost('data analytics', null, 0)).toBe(true);
     expect(shouldUseTheirStackBoost('internship', 'Google', 25)).toBe(true);
     expect(shouldUseTheirStackBoost('product management', null, 4)).toBe(true);
     expect(shouldUseTheirStackBoost('product management', null, 20)).toBe(false);
@@ -326,6 +346,53 @@ describe('individual listing validation', () => {
         },
         {
           jobDescription: 'Analyze customer needs and help improve product decisions.',
+        },
+      ),
+    ).toBe(true);
+  });
+
+  it('keeps genuine data analytics internships', () => {
+    expect(
+      workdayJobMatchesSearch(
+        'data analytics',
+        {
+          title: 'Data and Analytics Intern - Summer 2027',
+          externalPath: '/job/New-York-NY/Data-and-Analytics-Intern_R2468',
+        },
+        {
+          jobDescription:
+            'Build dashboards, SQL reporting, and business intelligence analyses for product teams.',
+        },
+      ),
+    ).toBe(true);
+  });
+
+  it('does not treat every data mention as a data analytics role', () => {
+    expect(
+      workdayJobMatchesSearch(
+        'data analytics',
+        {
+          title: 'Software Engineering Intern',
+          externalPath: '/job/Seattle-WA/Software-Engineering-Intern_R2222',
+        },
+        {
+          jobDescription:
+            'Build backend systems that process data for internal engineering platforms.',
+        },
+      ),
+    ).toBe(false);
+  });
+
+  it('keeps season-only searches broad instead of forcing a fake role match', () => {
+    expect(
+      workdayJobMatchesSearch(
+        'summer 2027',
+        {
+          title: 'Finance Intern - Summer 2027',
+          externalPath: '/job/New-York-NY/Finance-Intern-Summer-2027_R1234',
+        },
+        {
+          jobDescription: 'Join a summer internship program for finance students.',
         },
       ),
     ).toBe(true);
