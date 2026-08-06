@@ -118,6 +118,45 @@ describe('individual listing validation', () => {
     ).toBe(false);
   });
 
+  it('allows public LinkedIn job pages through the social web source', () => {
+    expect(
+      isActionablePosting(
+        result({
+          title: 'Product Management Intern - Summer 2027',
+          company: 'Google',
+          description: 'Apply for this product management internship on LinkedIn.',
+          applyUrl: 'https://www.linkedin.com/jobs/view/1234567890',
+          source: 'Social Web',
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('allows social posts only when they look like internship openings', () => {
+    expect(
+      isActionablePosting(
+        result({
+          title: 'Applications are open for our Data Analytics Intern program',
+          company: 'Example',
+          description: 'We are hiring a summer intern. Apply this week.',
+          applyUrl: 'https://x.com/example/status/1234567890',
+          source: 'Social Web',
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      isActionablePosting(
+        result({
+          title: 'Internship advice thread',
+          company: 'Example',
+          description: 'General tips for students looking for internships.',
+          applyUrl: 'https://x.com/example/status/987654321',
+          source: 'Social Web',
+        }),
+      ),
+    ).toBe(false);
+  });
+
   it('reads the current Google detail location instead of a related job location', () => {
     const html = `
       <meta property="og:title" content="Software Engineering Intern">

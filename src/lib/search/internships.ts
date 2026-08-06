@@ -19,6 +19,7 @@ export type InternshipSource =
   | 'JSearch'
   | 'Bright Data'
   | 'TheirStack'
+  | 'Social Web'
   | 'Web Search';
 
 export interface InternshipSearchResult {
@@ -247,6 +248,17 @@ interface SerpOrganicResult {
   title?: string;
   link?: string;
   snippet?: string;
+  date?: string;
+  source?: string;
+  displayed_link?: string;
+}
+
+interface SocialOrganicResult {
+  title?: string;
+  link?: string;
+  url?: string;
+  snippet?: string;
+  description?: string;
   date?: string;
   source?: string;
   displayed_link?: string;
@@ -578,6 +590,20 @@ const BOARD_SEARCH_SITES = [
   'metacareers.com',
 ];
 
+const SOCIAL_WEB_SEARCH_SITES = [
+  'linkedin.com/jobs/view',
+  'linkedin.com/posts',
+  'linkedin.com/feed/update',
+  'x.com',
+  'twitter.com',
+  'reddit.com/r/csMajors/comments',
+  'reddit.com/r/internships/comments',
+  'reddit.com/r/cscareerquestions/comments',
+  'joinhandshake.com/stu/jobs',
+  'simplify.jobs/p',
+  'wellfound.com/jobs',
+];
+
 const TEMPORARILY_DISABLED_RESULT_HOSTS = ['linkedin.com', 'indeed.com'];
 const THIRD_PARTY_BOARD_HOSTS = ['glassdoor.com', 'joinhandshake.com'];
 const COMPANY_CAREER_HOSTS = [
@@ -623,6 +649,7 @@ const SOURCE_QUALITY: Record<InternshipSource, number> = {
   JSearch: 6,
   'Bright Data': 7,
   TheirStack: 18,
+  'Social Web': 1,
   'Web Search': -4,
 };
 
@@ -2123,6 +2150,55 @@ function hostMatches(host: string, domains: string[]): boolean {
   return domains.some((domain) => host === domain || host.endsWith(`.${domain}`));
 }
 
+function isSocialWebResult(result: Omit<InternshipSearchResult, 'matchScore'>): boolean {
+  return result.source === 'Social Web';
+}
+
+function isSocialPostUrl(url: URL): boolean {
+  const host = url.hostname.replace(/^www\./, '').toLowerCase();
+  const path = url.pathname.toLowerCase();
+  if ((host === 'x.com' || host === 'twitter.com') && /\/[^/]+\/status\/\d+/.test(path)) {
+    return true;
+  }
+  if (host.endsWith('linkedin.com') && (/\/posts\//.test(path) || /\/feed\/update\//.test(path))) {
+    return true;
+  }
+  if (host.endsWith('reddit.com') && /\/comments\//.test(path)) return true;
+  return false;
+}
+
+function isSocialJobUrl(url: URL): boolean {
+  const host = url.hostname.replace(/^www\./, '').toLowerCase();
+  const path = url.pathname.toLowerCase();
+  if (host.endsWith('linkedin.com') && /\/jobs\/view\//.test(path)) return true;
+  if (host.endsWith('joinhandshake.com') && /\/stu\/jobs\/\d+/.test(path)) return true;
+  if (host.endsWith('simplify.jobs') && /\/(p|jobs)\//.test(path)) return true;
+  if (host.endsWith('wellfound.com') && /\/jobs\//.test(path)) return true;
+  return false;
+}
+
+function hasSocialListingSignal(text: string): boolean {
+  const normalized = normalizeText(text);
+  if (!hasInternshipSignal(normalized)) return false;
+  return [
+    'apply',
+    'applications open',
+    'application open',
+    'now open',
+    'hiring',
+    'join our',
+    'opening',
+    'open role',
+    'position',
+    'job',
+    'opportunity',
+    'recruiting',
+    'we are looking',
+    'were looking',
+    'we re looking',
+  ].some((term) => includesNormalizedTerm(normalized, term));
+}
+
 function isCompanyCareerResult(result: Omit<InternshipSearchResult, 'matchScore'>): boolean {
   if (
     result.source === 'Greenhouse' ||
@@ -2232,7 +2308,11 @@ function scoreResult(
   if (containsAny(haystack, NON_INTERNSHIP_TERMS)) score -= 34;
   if (!hasInternship) score -= 28;
   if (hasFullTimeCareerSignal(result)) score -= 50;
-  if (result.source === 'Web Search' && titleMatches.length === 0) score -= 12;
+  if (
+    (result.source === 'Web Search' || result.source === 'Social Web') &&
+    titleMatches.length === 0
+  )
+    score -= 12;
 
   return Math.max(0, Math.min(100, score));
 }
@@ -2270,6 +2350,17 @@ export function isActionablePosting(result: Omit<InternshipSearchResult, 'matchS
       );
     const looksLikeMediaPage = /\/(media|video|videos|blog|blogs|news)\//i.test(url.pathname);
     const explicitInternshipPosting = hasExplicitInternshipListingSignal(result);
+
+    if (isSocialWebResult(result)) {
+      if (!explicitInternshipPosting) return false;
+      if (isSocialJobUrl(url)) return true;
+      if (isSocialPostUrl(url)) {
+        return hasSocialListingSignal(
+          `${result.title} ${result.description ?? ''} ${result.applyUrl}`,
+        );
+      }
+      return hasJobDetailPath;
+    }
 
     if (!hasJobDetailPath && (result.source === 'Company Site' || result.source === 'Web Search')) {
       return false;
@@ -2320,6 +2411,7 @@ export function matchesCompanyResult(
 }
 
 function usesTemporarilyDisabledHost(result: Omit<InternshipSearchResult, 'matchScore'>): boolean {
+  if (isSocialWebResult(result)) return false;
   const host = resultHost(result);
   return Boolean(host && hostMatches(host, TEMPORARILY_DISABLED_RESULT_HOSTS));
 }
@@ -2347,7 +2439,10 @@ function isRelevantToSearch(
 
 function shouldRequireRoleRelevance(result: Omit<InternshipSearchResult, 'matchScore'>): boolean {
   return (
-    result.source === 'Adzuna' || result.source === 'Google Jobs' || result.source === 'Web Search'
+    result.source === 'Adzuna' ||
+    result.source === 'Google Jobs' ||
+    result.source === 'Social Web' ||
+    result.source === 'Web Search'
   );
 }
 
@@ -3583,6 +3678,163 @@ async function searchWebResults(
     });
 }
 
+function shouldSearchSocialWeb(query: string, company?: string | null): boolean {
+  return Boolean(company?.trim()) || isFocusedRoleSearch(query);
+}
+
+function socialWebSearchQuery(
+  query: string,
+  location?: string | null,
+  company?: string | null,
+  season?: SearchOptions['season'],
+): string {
+  const locationQuery = location ? ` ${location}` : '';
+  const siteQuery = SOCIAL_WEB_SEARCH_SITES.map((site) => `site:${site}`).join(' OR ');
+  return `${normalizeQuery(query, company, season)}${locationQuery} (internship OR intern OR co-op OR "summer analyst" OR "summer associate") (apply OR hiring OR "applications open" OR "now open" OR recruiting OR job OR position) (${siteQuery})`;
+}
+
+function mapSocialWebResult(
+  result: SocialOrganicResult,
+  location?: string | null,
+  company?: string | null,
+): InternshipSearchResult | null {
+  const applyUrl = result.link ?? result.url;
+  const title = result.title;
+  if (!applyUrl || !title) return null;
+  const description = stripHtml(result.snippet ?? result.description) ?? 'Found on the public web.';
+  const inferredCompany =
+    company?.trim() ||
+    inferEmployerFromUrl(applyUrl) ||
+    result.source ||
+    result.displayed_link ||
+    'Public web';
+  return {
+    id: stableId('Social Web', applyUrl, title, inferredCompany),
+    title,
+    company: inferredCompany,
+    location: location ?? 'See posting',
+    description,
+    applyUrl,
+    postedAt: normalizePostingDate(result.date),
+    modality: inferModality(`${title} ${description}`),
+    source: 'Social Web',
+  };
+}
+
+function socialWebResultMatches(
+  job: InternshipSearchResult,
+  queryTerms: string[],
+  company?: string | null,
+): boolean {
+  const haystack = normalizeText(`${job.title} ${job.description ?? ''} ${job.applyUrl}`);
+  const roleMatches = queryTerms.length === 0 || containsRoleSignal(haystack, queryTerms);
+  const companyMatches = matchesCompanyResult(job, company);
+  let socialListing = hasSocialListingSignal(haystack);
+  try {
+    const url = new URL(job.applyUrl);
+    socialListing = socialListing || isSocialJobUrl(url);
+  } catch {
+    socialListing = false;
+  }
+  return (
+    hasInternshipSignal(haystack) &&
+    socialListing &&
+    roleMatches &&
+    companyMatches &&
+    isActionablePosting(job)
+  );
+}
+
+async function searchSerpApiSocialWebResults(
+  query: string,
+  location?: string | null,
+  company?: string | null,
+  season?: SearchOptions['season'],
+): Promise<InternshipSearchResult[]> {
+  if (!process.env.SERPAPI_API_KEY) return [];
+
+  const params = new URLSearchParams({
+    engine: 'google',
+    api_key: process.env.SERPAPI_API_KEY,
+    q: socialWebSearchQuery(query, location, company, season),
+    num: '20',
+    hl: 'en',
+    gl: 'us',
+  });
+
+  const data = await fetchJson<{ organic_results?: SerpOrganicResult[] }>(
+    `https://serpapi.com/search.json?${params.toString()}`,
+  );
+  const queryTerms = roleMatchTermsFor(query);
+  return (data?.organic_results ?? [])
+    .map((result) => mapSocialWebResult(result, location, company))
+    .filter((job): job is InternshipSearchResult => Boolean(job))
+    .filter((job) => socialWebResultMatches(job, queryTerms, company));
+}
+
+function brightDataOrganicResults(payload: BrightDataSerpResponse): SocialOrganicResult[] {
+  return [...(payload.organic ?? []), ...(payload.organic_results ?? [])];
+}
+
+async function searchBrightDataSocialWebResults(
+  query: string,
+  location?: string | null,
+  company?: string | null,
+  season?: SearchOptions['season'],
+): Promise<InternshipSearchResult[]> {
+  const apiKey = process.env.BRIGHTDATA_API_KEY;
+  if (!apiKey) return [];
+
+  const zone = process.env.BRIGHTDATA_SERP_ZONE || 'serp_api1';
+  const searchUrl = new URL('https://www.google.com/search');
+  searchUrl.searchParams.set('q', socialWebSearchQuery(query, location, company, season));
+  searchUrl.searchParams.set('hl', 'en');
+  searchUrl.searchParams.set('gl', 'us');
+
+  try {
+    const response = await withTimeout(
+      fetch('https://api.brightdata.com/request', {
+        method: 'POST',
+        cache: 'force-cache',
+        next: { revalidate: DAILY_REVALIDATE_SECONDS },
+        headers: {
+          accept: 'application/json',
+          authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          zone,
+          url: searchUrl.toString(),
+          format: 'json',
+          data_format: 'parsed',
+        }),
+      }),
+    );
+    if (!response.ok) return [];
+    const payload = (await response.json()) as BrightDataSerpResponse;
+    const queryTerms = roleMatchTermsFor(query);
+    return brightDataOrganicResults(payload)
+      .map((result) => mapSocialWebResult(result, location, company))
+      .filter((job): job is InternshipSearchResult => Boolean(job))
+      .filter((job) => socialWebResultMatches(job, queryTerms, company));
+  } catch {
+    return [];
+  }
+}
+
+async function searchSocialWebResults(
+  query: string,
+  location?: string | null,
+  company?: string | null,
+  season?: SearchOptions['season'],
+): Promise<InternshipSearchResult[]> {
+  if (!shouldSearchSocialWeb(query, company)) return [];
+  const serpResults = await searchSerpApiSocialWebResults(query, location, company, season);
+  return serpResults.length > 0
+    ? serpResults
+    : searchBrightDataSocialWebResults(query, location, company, season);
+}
+
 function smartRecruitersLocation(posting: SmartRecruitersPosting): string {
   const location = posting.location;
   if (!location) return 'See posting';
@@ -4461,6 +4713,7 @@ export async function searchInternships(options: SearchOptions): Promise<Interns
     ...providerQueries
       .slice(0, 2)
       .map((query) => searchAdzuna(query, providerLocation, options.company, options.season)),
+    searchSocialWebResults(effectiveQuery, providerLocation, options.company, options.season),
     searchWebResults(effectiveQuery, providerLocation, options.company, options.season),
   ]);
 
