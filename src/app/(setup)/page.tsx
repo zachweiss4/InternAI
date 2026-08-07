@@ -13,9 +13,19 @@ import { siteDescription, siteName } from '@/lib/site';
 export const metadata: Metadata = {
   title: { absolute: siteName },
   description: siteDescription,
-  // Do not export an explicit openGraph object here; that suppresses the
-  // file-based opengraph-image.tsx for the home route.
   alternates: { canonical: '/' },
+  openGraph: {
+    title: siteName,
+    description: siteDescription,
+    url: '/',
+    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'InternAI opportunity radar' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: siteName,
+    description: siteDescription,
+    images: ['/og.png'],
+  },
 };
 
 export default function SetupPlaceholder() {

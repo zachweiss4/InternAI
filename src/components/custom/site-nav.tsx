@@ -2,7 +2,7 @@
 
 'use client';
 
-import { ChevronDown, Menu } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, Menu, Orbit, Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import * as React from 'react';
@@ -109,22 +109,27 @@ export function SiteNav() {
     slot.type === 'link' ? isActive(slot.item.href) : slot.items.some((i) => isActive(i.href));
 
   const navButtonClass =
-    'rounded-full px-4 text-[var(--editorial-ink)] shadow-none hover:bg-[var(--editorial-sage)] hover:text-[var(--editorial-ink)]';
+    'h-9 rounded-[9px] px-3.5 text-[var(--editorial-muted)] shadow-none hover:bg-[var(--editorial-sage)] hover:text-[var(--editorial-ink)]';
   const activeNavButtonClass =
     'bg-[var(--editorial-ink)] text-[var(--editorial-paper)] hover:bg-[var(--editorial-moss-deep)] hover:text-[var(--editorial-paper)]';
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-[var(--editorial-line)] bg-[var(--editorial-paper)]/92 backdrop-blur supports-[backdrop-filter]:bg-[var(--editorial-paper)]/78">
+    <header className="sticky top-0 z-40 w-full border-b border-[var(--editorial-line)] bg-[var(--editorial-paper)]/90 backdrop-blur-xl supports-[backdrop-filter]:bg-[var(--editorial-paper)]/78">
       <nav
         aria-label="Primary"
-        className="mx-auto flex h-16 max-w-[82rem] items-center gap-2 px-gutter"
+        className="mx-auto flex h-[4.5rem] max-w-[82rem] items-center gap-2 px-gutter"
       >
         <Link
           href="/"
           aria-label={`${siteName} home`}
-          className="mr-4 shrink-0 truncate text-[1.35rem] font-bold tracking-[-0.03em] text-[var(--editorial-ink)]"
+          className="mr-5 inline-flex shrink-0 items-center gap-2.5 text-[1.2rem] font-extrabold tracking-[-0.04em] text-[var(--editorial-ink)]"
         >
-          InternAI
+          <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[var(--editorial-ink)] text-[var(--editorial-paper)] shadow-[0_8px_22px_rgb(31_43_34_/_0.14)]">
+            <Orbit aria-hidden="true" className="h-[1.1rem] w-[1.1rem]" />
+          </span>
+          <span>
+            Intern<span className="text-[var(--editorial-coral)]">AI</span>
+          </span>
         </Link>
 
         {/* Desktop (md+): inline slots with direct links and `menu` dropdowns */}
@@ -238,8 +243,19 @@ export function SiteNav() {
             <AuthNav />
           </div>
 
+          <Button
+            asChild
+            size="sm"
+            className="ml-1 hidden h-9 rounded-[9px] bg-[var(--editorial-ink)] px-4 text-[var(--editorial-paper)] shadow-none hover:bg-[var(--editorial-moss-deep)] lg:inline-flex"
+          >
+            <Link href="/search">
+              <Search aria-hidden="true" />
+              Find internships
+            </Link>
+          </Button>
+
           {/* Always visible */}
-          <ThemeToggle className="rounded-full text-[var(--editorial-ink)] hover:bg-[var(--editorial-sage)] hover:text-[var(--editorial-ink)]" />
+          <ThemeToggle className="ml-1 rounded-[9px] text-[var(--editorial-ink)] hover:bg-[var(--editorial-sage)] hover:text-[var(--editorial-ink)]" />
 
           {/* Mobile (below md): burger and drawer when there is something to collapse */}
           {collapsedCount > 0 && (
@@ -248,7 +264,7 @@ export function SiteNav() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="rounded-full text-[var(--editorial-ink)] hover:bg-[var(--editorial-sage)] md:hidden"
+                  className="rounded-[9px] text-[var(--editorial-ink)] hover:bg-[var(--editorial-sage)] md:hidden"
                 >
                   <Menu />
                   <span className="sr-only">Open menu</span>
@@ -331,17 +347,56 @@ export function SiteFooter() {
   if (footer.length === 0) return null;
 
   return (
-    <footer className="border-t border-[var(--editorial-line)] bg-[var(--editorial-paper)]">
-      <nav
-        aria-label="Footer"
-        className="mx-auto flex max-w-screen-xl flex-wrap items-center gap-1 px-4 py-6 text-sm"
-      >
-        {footer.map((item) => (
-          <Button key={item.href} asChild variant="link" size="sm">
-            <Link href={item.href}>{item.label}</Link>
+    <footer className="border-t border-[var(--editorial-line)] bg-[var(--editorial-ink)] text-[var(--editorial-paper)]">
+      <div className="mx-auto grid max-w-[82rem] gap-10 px-gutter py-10 sm:py-12 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+        <div>
+          <Link
+            href="/"
+            aria-label={`${siteName} home`}
+            className="inline-flex items-center gap-2.5 text-xl font-extrabold tracking-[-0.04em]"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[var(--editorial-coral)] text-[#30231f]">
+              <Orbit aria-hidden="true" className="h-[1.1rem] w-[1.1rem]" />
+            </span>
+            InternAI
+          </Link>
+          <p className="mt-4 max-w-md text-sm leading-7 text-white/65">
+            Find better internships, understand the match, and keep every application moving in one
+            focused workspace.
+          </p>
+        </div>
+
+        <nav aria-label="Footer" className="flex flex-wrap items-center gap-x-1 gap-y-2 text-sm">
+          {footer.map((item) => (
+            <Button
+              key={item.href}
+              asChild
+              variant="ghost"
+              size="sm"
+              className="rounded-[8px] text-white/70 hover:bg-white/10 hover:text-white"
+            >
+              <Link href={item.href}>{item.label}</Link>
+            </Button>
+          ))}
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="rounded-[8px] text-[var(--editorial-coral-soft)] hover:bg-white/10 hover:text-white"
+          >
+            <Link href="/search">
+              Search now
+              <ArrowUpRight aria-hidden="true" />
+            </Link>
           </Button>
-        ))}
-      </nav>
+        </nav>
+      </div>
+      <div className="border-t border-white/10">
+        <div className="mx-auto flex max-w-[82rem] flex-col gap-2 px-gutter py-5 text-xs text-white/48 sm:flex-row sm:items-center sm:justify-between">
+          <p>© {new Date().getFullYear()} InternAI. Built for ambitious students.</p>
+          <p>Real sources. Clear fit. Better follow-through.</p>
+        </div>
+      </div>
     </footer>
   );
 }

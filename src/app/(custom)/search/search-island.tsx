@@ -1,5 +1,6 @@
 'use client';
 
+import { motion, useReducedMotion } from 'framer-motion';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -265,7 +266,7 @@ function ResultCard({
   }
 
   return (
-    <Card className="group transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 border-border/60">
+    <Card className="group border-[var(--editorial-line)] bg-[var(--editorial-cream)] shadow-[0_12px_34px_rgb(31_43_34_/_0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--editorial-moss)] hover:shadow-md">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -423,6 +424,7 @@ function SkeletonCard() {
 }
 
 export function SearchIsland() {
+  const reduceMotion = useReducedMotion();
   const searchParams = useSearchParams();
   const [query, setQuery] = useState('');
   const [role, setRole] = useState('');
@@ -575,7 +577,7 @@ export function SearchIsland() {
   return (
     <div className="space-y-8">
       {/* Search form */}
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div className="flex flex-col gap-3 lg:flex-row">
           <div className="grid flex-1 gap-3 md:grid-cols-[220px_1fr]">
             <Select
@@ -607,7 +609,7 @@ export function SearchIsland() {
             type="submit"
             size="lg"
             disabled={loading || (!query.trim() && !role && !company.trim())}
-            className="h-12 px-6 bg-brand-600 hover:bg-brand-700 text-white lg:w-auto"
+            className="h-12 rounded-[10px] bg-[var(--editorial-ink)] px-6 text-[var(--editorial-paper)] shadow-none hover:bg-[var(--editorial-moss-deep)] lg:w-auto"
           >
             {loading ? (
               <span className="flex items-center gap-2">
@@ -704,7 +706,7 @@ export function SearchIsland() {
             ))}
           </datalist>
         </div>
-        <div className="flex items-center gap-3 rounded-md border border-border/70 px-3 py-2">
+        <div className="flex items-center gap-3 rounded-[10px] border border-[var(--editorial-line)] bg-[var(--editorial-paper)]/60 px-3 py-2.5">
           <Switch
             id="profile-match"
             checked={profileMatch}
@@ -722,7 +724,7 @@ export function SearchIsland() {
               type="button"
               onClick={() => setCompany(option)}
               disabled={loading}
-              className="rounded-full border border-border/70 bg-background px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 disabled:opacity-50"
+              className="rounded-full border border-[var(--editorial-line)] bg-[var(--editorial-paper)] px-3 py-1.5 text-xs font-medium text-[var(--editorial-muted)] transition-colors hover:border-[var(--editorial-moss)] hover:bg-[var(--editorial-sage)] hover:text-[var(--editorial-ink)] disabled:opacity-50"
             >
               {option}
             </button>
@@ -783,7 +785,7 @@ export function SearchIsland() {
                   setSeason('');
                   handleSearch({ query: example, role: '', location: '', company: '', season: '' });
                 }}
-                className="rounded-full border border-border/70 bg-background px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+                className="rounded-full border border-[var(--editorial-line)] bg-[var(--editorial-cream)] px-3 py-1.5 text-sm text-[var(--editorial-muted)] transition-colors hover:border-[var(--editorial-moss)] hover:bg-[var(--editorial-sage)] hover:text-[var(--editorial-ink)]"
               >
                 {example}
               </button>
@@ -832,56 +834,62 @@ export function SearchIsland() {
             <>
               <Separator className="my-2" />
               <div className="grid gap-4">
-                {sortedResults?.map((result) => (
-                  <ResultCard
+                {sortedResults?.map((result, index) => (
+                  <motion.div
                     key={result.id}
-                    result={result}
-                    isApplied={appliedJobIds.has(result.id)}
-                    isSaved={savedJobIds.has(result.id)}
-                    onApply={async () => {
-                      await apiFetch('/api/applications', {
-                        method: 'POST',
-                        body: JSON.stringify({
-                          jobId: result.id,
-                          jobTitle: result.title,
-                          company: result.company,
-                          applyUrl: result.applyUrl,
-                        }),
-                        schema: ApplicationResponse,
-                      });
-                      setAppliedJobIds((prev) => new Set([...prev, result.id]));
-                    }}
-                    onSave={async () => {
-                      await apiFetch('/api/saved', {
-                        method: 'POST',
-                        body: JSON.stringify({
-                          jobId: result.id,
-                          jobData: {
-                            title: result.title,
+                    initial={reduceMotion ? false : { opacity: 0, y: 18 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.42, delay: Math.min(index * 0.04, 0.24) }}
+                  >
+                    <ResultCard
+                      result={result}
+                      isApplied={appliedJobIds.has(result.id)}
+                      isSaved={savedJobIds.has(result.id)}
+                      onApply={async () => {
+                        await apiFetch('/api/applications', {
+                          method: 'POST',
+                          body: JSON.stringify({
+                            jobId: result.id,
+                            jobTitle: result.title,
                             company: result.company,
-                            location: result.location,
                             applyUrl: result.applyUrl,
-                            salaryMin: result.salaryMin,
-                            salaryMax: result.salaryMax,
-                            modality: result.modality,
-                            description: result.description,
-                            matchScore: result.matchScore,
-                          },
-                        }),
-                      });
-                      setSavedJobIds((prev) => new Set([...prev, result.id]));
-                    }}
-                    onUnsave={async () => {
-                      const savedId = savedIdByJobId.get(result.id);
-                      if (!savedId) return;
-                      await apiFetch(`/api/saved/${savedId}`, { method: 'DELETE' });
-                      setSavedJobIds((prev) => {
-                        const next = new Set(prev);
-                        next.delete(result.id);
-                        return next;
-                      });
-                    }}
-                  />
+                          }),
+                          schema: ApplicationResponse,
+                        });
+                        setAppliedJobIds((prev) => new Set([...prev, result.id]));
+                      }}
+                      onSave={async () => {
+                        await apiFetch('/api/saved', {
+                          method: 'POST',
+                          body: JSON.stringify({
+                            jobId: result.id,
+                            jobData: {
+                              title: result.title,
+                              company: result.company,
+                              location: result.location,
+                              applyUrl: result.applyUrl,
+                              salaryMin: result.salaryMin,
+                              salaryMax: result.salaryMax,
+                              modality: result.modality,
+                              description: result.description,
+                              matchScore: result.matchScore,
+                            },
+                          }),
+                        });
+                        setSavedJobIds((prev) => new Set([...prev, result.id]));
+                      }}
+                      onUnsave={async () => {
+                        const savedId = savedIdByJobId.get(result.id);
+                        if (!savedId) return;
+                        await apiFetch(`/api/saved/${savedId}`, { method: 'DELETE' });
+                        setSavedJobIds((prev) => {
+                          const next = new Set(prev);
+                          next.delete(result.id);
+                          return next;
+                        });
+                      }}
+                    />
+                  </motion.div>
                 ))}
               </div>
             </>

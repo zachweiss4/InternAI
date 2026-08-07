@@ -2,102 +2,169 @@
 
 // @:user-owned
 
-const FEATURES = [
+import { motion, useReducedMotion } from 'framer-motion';
+import {
+  BellRing,
+  FileCheck2,
+  Fingerprint,
+  ListChecks,
+  type LucideIcon,
+  SearchCheck,
+  Waypoints,
+} from 'lucide-react';
+
+interface Feature {
+  number: string;
+  tag: string;
+  title: string;
+  description: string;
+  detail: string;
+  icon: LucideIcon;
+  className: string;
+  tone?: 'ink' | 'coral';
+}
+
+const FEATURES: Feature[] = [
   {
     number: '01',
-    tag: 'Source',
-    title: 'Company pages before aggregators',
+    tag: 'Discovery',
+    title: 'Search beyond the obvious job boards',
     description:
-      'InternAI gives priority to early career pages and ATS feeds, then uses outside sources only to widen coverage.',
-    className: 'lg:col-span-7 lg:mt-10',
-    tone: 'paper',
+      'InternAI starts with company career pages and public ATS feeds, then widens the search with trusted job APIs and public social signals.',
+    detail: 'Source-first results with fewer dead links',
+    icon: Waypoints,
+    className: 'lg:col-span-7',
+    tone: 'ink',
   },
   {
     number: '02',
-    tag: 'Judgment',
-    title: 'Fit that explains itself',
+    tag: 'Relevance',
+    title: 'A match score you can actually understand',
     description:
-      'Optional resume matching shows why a role fits, where your profile is strong, and which details need sharper language.',
-    className: 'lg:col-span-5',
-    tone: 'moss',
+      'Optional resume matching explains the overlap between your background and each role without hiding the original listing.',
+    detail: 'Skills, role intent, recency, and source quality',
+    icon: Fingerprint,
+    className: 'lg:col-span-5 lg:translate-y-10',
   },
   {
     number: '03',
     tag: 'Search',
-    title: 'Plain English search',
+    title: 'Ask naturally. Refine precisely.',
     description:
-      'Ask for a role, company, location, season, or working style. You can search broadly or start with one company.',
-    className: 'lg:col-span-5 lg:col-start-2 lg:mt-12',
-    tone: 'paper',
+      'Start with plain English, then narrow by role, company, location, season, working style, or the newest postings.',
+    detail: 'From “finance near campus” to a focused shortlist',
+    icon: SearchCheck,
+    className: 'lg:col-span-5',
   },
   {
     number: '04',
-    tag: 'Voice',
-    title: 'Applications stay yours',
+    tag: 'Applications',
+    title: 'Keep every next step in one place',
     description:
-      'Draft resumes and letters are built for review first, so the final application still sounds like you.',
-    className: 'lg:col-span-7 lg:-mt-8',
-    tone: 'paper',
+      'Save promising roles, track applications, add notes, and see deadlines without rebuilding the same spreadsheet every week.',
+    detail: 'A calmer pipeline from saved to offer',
+    icon: ListChecks,
+    className: 'lg:col-span-7',
+    tone: 'coral',
   },
   {
     number: '05',
-    tag: 'Timing',
-    title: 'Alerts for fresh postings',
+    tag: 'Documents',
+    title: 'Shape stronger applications without losing your voice',
     description:
-      'Daily checks only email you about new matches, not the same recycled listing every morning.',
-    className: 'lg:col-span-5 lg:col-start-4',
-    tone: 'paper',
+      'Use your profile and the real job description to draft materials that are specific, reviewable, and still sound like you.',
+    detail: 'Resume analysis and application-ready documents',
+    icon: FileCheck2,
+    className: 'lg:col-span-7 lg:ml-12',
   },
   {
     number: '06',
-    tag: 'Pipeline',
-    title: 'A calmer pipeline',
+    tag: 'Timing',
+    title: 'Let fresh roles find you',
     description:
-      'Saved roles, statuses, deadlines, and notes live together so the search feels less scattered.',
-    className: 'lg:col-span-4 lg:translate-y-8',
-    tone: 'paper',
+      'Daily alerts check for new matches and remember what they already sent, so your inbox stays useful instead of repetitive.',
+    detail: 'New postings, not recycled noise',
+    icon: BellRing,
+    className: 'lg:col-span-5 lg:-ml-12 lg:translate-y-8',
+    tone: 'ink',
   },
 ];
 
 export function InternAIFeatures() {
+  const reduceMotion = useReducedMotion();
+
   return (
     <section id="features" className="px-gutter py-section-lg">
       <div className="editorial-page">
-        <div className="grid gap-5 lg:grid-cols-12 lg:gap-6">
-          <header className="lg:col-span-5 lg:pt-8">
-            <p className="editorial-kicker mb-4">What InternAI Does</p>
-            <h2 className="editorial-serif max-w-xl text-[clamp(2.4rem,5vw,4.8rem)] leading-[0.95]">
-              Less noise. More roles worth opening.
+        <motion.header
+          initial={reduceMotion ? false : { opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="mb-10 grid gap-6 border-b border-[var(--editorial-line)] pb-9 lg:grid-cols-[minmax(0,0.82fr)_minmax(18rem,0.38fr)] lg:items-end"
+        >
+          <div>
+            <p className="editorial-kicker mb-4">A better operating system for the search</p>
+            <h2 className="editorial-serif max-w-4xl text-[clamp(2.8rem,5.5vw,5.5rem)] leading-[0.9]">
+              Everything between “I should apply” and “submitted.”
             </h2>
-            <p className="editorial-copy mt-6 max-w-md">
-              The product is built around one simple promise: help students find real internships,
-              understand their fit, and act before the window closes.
-            </p>
-          </header>
+          </div>
+          <p className="editorial-copy lg:pb-2">
+            Built to reduce the fragmented tabs, stale links, repeated searches, and forgotten
+            deadlines that make internship hunting feel like a second job.
+          </p>
+        </motion.header>
 
-          {FEATURES.map((feature) => (
-            <article
-              key={feature.title}
-              className={`editorial-panel editorial-feature-card flex flex-col justify-between p-5 sm:p-7 ${
-                feature.tone === 'moss' ? 'is-moss' : ''
-              } ${feature.className}`}
-            >
-              <div>
-                <div className="mb-8 flex items-center justify-between gap-4">
-                  <span className="editorial-pill">{feature.tag}</span>
-                  <span className="text-sm font-bold text-[var(--editorial-coral)]">
+        <div className="grid gap-5 lg:grid-cols-12 lg:gap-6">
+          {FEATURES.map((feature, index) => {
+            const Icon = feature.icon;
+            return (
+              <motion.article
+                key={feature.title}
+                initial={reduceMotion ? false : { opacity: 0, y: 28 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.18 }}
+                transition={{ duration: 0.6, delay: (index % 2) * 0.08, ease: [0.16, 1, 0.3, 1] }}
+                className={`editorial-feature-card group relative flex min-h-[20rem] flex-col justify-between overflow-hidden rounded-[16px] border border-[var(--editorial-line)] p-6 sm:p-8 ${
+                  feature.tone === 'ink'
+                    ? 'bg-[var(--editorial-ink)] text-[var(--editorial-paper)]'
+                    : feature.tone === 'coral'
+                      ? 'bg-[var(--editorial-coral)] text-[#30231f]'
+                      : 'bg-[var(--editorial-cream)] text-[var(--editorial-ink)]'
+                } ${feature.className}`}
+              >
+                <div
+                  aria-hidden="true"
+                  className="absolute -right-14 -top-14 h-40 w-40 rounded-full border border-current opacity-10 transition-transform duration-500 group-hover:scale-110"
+                />
+                <div className="relative flex items-start justify-between gap-5">
+                  <span className="inline-flex min-h-8 items-center rounded-full border border-current/20 px-3 text-[0.68rem] font-bold uppercase tracking-[0.1em]">
+                    {feature.tag}
+                  </span>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-[11px] border border-current/15 bg-current/5">
+                    <Icon aria-hidden="true" className="h-5 w-5" />
+                  </div>
+                </div>
+
+                <div className="relative mt-10">
+                  <span className="editorial-serif text-4xl leading-none text-[var(--editorial-coral-soft)]">
                     {feature.number}
                   </span>
+                  <h3 className="editorial-serif mt-4 max-w-2xl text-[clamp(2rem,3.5vw,3.4rem)] leading-[0.96]">
+                    {feature.title}
+                  </h3>
+                  <p className="mt-5 max-w-2xl text-sm leading-7 opacity-75">
+                    {feature.description}
+                  </p>
                 </div>
-                <h3 className="editorial-serif max-w-lg text-[clamp(2rem,3.2vw,3.15rem)] leading-[1.02]">
-                  {feature.title}
-                </h3>
-              </div>
-              <p className="mt-8 text-sm leading-7 text-[var(--editorial-muted)]">
-                {feature.description}
-              </p>
-            </article>
-          ))}
+
+                <div className="relative mt-8 flex items-center gap-3 border-t border-current/15 pt-4 text-xs font-bold uppercase tracking-[0.08em] opacity-70">
+                  <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
+                  {feature.detail}
+                </div>
+              </motion.article>
+            );
+          })}
         </div>
       </div>
     </section>

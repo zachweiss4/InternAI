@@ -2,6 +2,8 @@
 
 // @:user-owned
 
+import { motion, useReducedMotion } from 'framer-motion';
+import { MessageCircleQuestion } from 'lucide-react';
 import {
   Accordion,
   AccordionContent,
@@ -43,11 +45,22 @@ const FAQS = [
 ];
 
 export function InternAIFAQ() {
+  const reduceMotion = useReducedMotion();
+
   return (
     <section id="faq" className="px-gutter py-section-lg">
       <div className="editorial-page">
         <div className="grid gap-10 lg:grid-cols-[minmax(15rem,0.58fr)_minmax(0,1.12fr)] lg:items-start">
-          <header className="lg:pt-8">
+          <motion.header
+            initial={reduceMotion ? false : { opacity: 0, x: -24 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, amount: 0.35 }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            className="lg:pt-8"
+          >
+            <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-[12px] bg-[var(--editorial-sage)] text-[var(--editorial-moss-deep)]">
+              <MessageCircleQuestion aria-hidden="true" className="h-5 w-5" />
+            </div>
             <p className="editorial-kicker mb-4">Common Questions</p>
             <h2 className="editorial-serif text-[clamp(2.2rem,4.5vw,4.2rem)] leading-[0.96]">
               The practical details, without the pitch voice.
@@ -55,9 +68,15 @@ export function InternAIFAQ() {
             <p className="editorial-copy mt-5 max-w-sm">
               A good search tool should tell you where things came from and what it can actually do.
             </p>
-          </header>
+          </motion.header>
 
-          <div className="editorial-panel p-3 sm:p-5">
+          <motion.div
+            initial={reduceMotion ? false : { opacity: 0, y: 26 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+            className="editorial-panel p-3 sm:p-5"
+          >
             <Accordion type="single" collapsible className="w-full">
               {FAQS.map((faq, i) => (
                 <AccordionItem
@@ -74,7 +93,7 @@ export function InternAIFAQ() {
                 </AccordionItem>
               ))}
             </Accordion>
-          </div>
+          </motion.div>
         </div>
       </div>
     </section>
