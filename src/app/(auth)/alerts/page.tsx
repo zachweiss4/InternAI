@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { InternAIAppShell } from '@/components/custom/internai-app-shell';
 import { AlertsIsland } from './alerts-island';
 
 export const metadata: Metadata = {
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function AlertsPage() {
-  return <AlertsIsland />;
+  return (
+    <InternAIAppShell>
+      <AlertsIsland />
+    </InternAIAppShell>
+  );
 }

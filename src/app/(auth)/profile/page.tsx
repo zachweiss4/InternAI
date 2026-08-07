@@ -1,6 +1,7 @@
 // @:user-owned - seeded by /modules/better-auth; restyle freely.
 
 import type { Metadata } from 'next';
+import { InternAIAppShell } from '@/components/custom/internai-app-shell';
 import { ProfileIsland } from './profile-island';
 
 export const metadata: Metadata = {
@@ -9,5 +10,9 @@ export const metadata: Metadata = {
 };
 
 export default function ProfilePage() {
-  return <ProfileIsland />;
+  return (
+    <InternAIAppShell>
+      <ProfileIsland />
+    </InternAIAppShell>
+  );
 }

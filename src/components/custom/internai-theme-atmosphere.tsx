@@ -1,6 +1,6 @@
 'use client';
 
-import { LiquidMetalShader } from '@/app/(custom)/design-lab/liquid-metal-shader';
+import { LiquidMetalShader } from '@/components/custom/liquid-metal-shader';
 import { AnimatedGradient, type GradientConfig } from '@/components/ui/animated-gradient';
 import { cn } from '@/lib/utils';
 

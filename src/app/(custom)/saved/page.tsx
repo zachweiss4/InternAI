@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { InternAIAppShell } from '@/components/custom/internai-app-shell';
 import { SavedIsland } from './saved-island';
 
 export const metadata: Metadata = {
@@ -8,10 +9,12 @@ export const metadata: Metadata = {
 
 export default function SavedPage() {
   return (
-    <main className="container-page py-section">
-      <div className="mx-auto max-w-3xl">
-        <SavedIsland />
-      </div>
-    </main>
+    <InternAIAppShell>
+      <main className="container-page py-section">
+        <div className="mx-auto max-w-3xl">
+          <SavedIsland />
+        </div>
+      </main>
+    </InternAIAppShell>
   );
 }

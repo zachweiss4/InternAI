@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { InternAIAppShell } from '@/components/custom/internai-app-shell';
 import { PricingIsland } from './pricing-island';
 
 export const metadata: Metadata = {
@@ -9,8 +10,10 @@ export const metadata: Metadata = {
 
 export default function PricingPage() {
   return (
-    <main className="min-h-screen">
-      <PricingIsland />
-    </main>
+    <InternAIAppShell>
+      <main className="min-h-screen">
+        <PricingIsland />
+      </main>
+    </InternAIAppShell>
   );
 }

@@ -360,7 +360,7 @@ export function SiteFooter() {
             </span>
             InternAI
           </Link>
-          <p className="mt-4 max-w-md text-sm leading-7 text-white/65">
+          <p className="mt-4 max-w-md text-sm leading-7 text-white/80">
             Find better internships, understand the match, and keep every application moving in one
             focused workspace.
           </p>
@@ -373,7 +373,7 @@ export function SiteFooter() {
               asChild
               variant="ghost"
               size="sm"
-              className="rounded-[8px] text-white/70 hover:bg-white/10 hover:text-white"
+              className="rounded-[8px] text-white/90 hover:bg-white/10 hover:text-white"
             >
               <Link href={item.href}>{item.label}</Link>
             </Button>
@@ -391,8 +391,8 @@ export function SiteFooter() {
           </Button>
         </nav>
       </div>
-      <div className="border-t border-white/10">
-        <div className="mx-auto flex max-w-[82rem] flex-col gap-2 px-gutter py-5 text-xs text-white/48 sm:flex-row sm:items-center sm:justify-between">
+      <div className="border-t border-white/20">
+        <div className="mx-auto flex max-w-[82rem] flex-col gap-2 px-gutter py-5 text-xs text-white/70 sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} InternAI. Built for ambitious students.</p>
           <p>Real sources. Clear fit. Better follow-through.</p>
         </div>

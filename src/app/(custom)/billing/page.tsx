@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { InternAIAppShell } from '@/components/custom/internai-app-shell';
 import { BillingIsland } from './billing-island';
 
 export const metadata: Metadata = {
@@ -8,16 +9,18 @@ export const metadata: Metadata = {
 
 export default function BillingPage() {
   return (
-    <main className="min-h-screen py-section px-gutter">
-      <div className="container-page max-w-2xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-h1 font-display">Billing</h1>
-          <p className="text-body text-muted-foreground mt-2">
-            Manage your subscription plan and billing.
-          </p>
+    <InternAIAppShell>
+      <main className="min-h-screen px-gutter py-section">
+        <div className="container-page mx-auto max-w-2xl">
+          <div className="mb-8">
+            <h1 className="font-display text-h1">Billing</h1>
+            <p className="mt-2 text-body text-muted-foreground">
+              Manage your subscription plan and billing.
+            </p>
+          </div>
+          <BillingIsland />
         </div>
-        <BillingIsland />
-      </div>
-    </main>
+      </main>
+    </InternAIAppShell>
   );
 }
