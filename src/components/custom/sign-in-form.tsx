@@ -7,6 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { signIn } from '@/lib/auth-client';
 
+function safeNextPath(): string {
+  const next = new URLSearchParams(window.location.search).get('next');
+  if (!next || !next.startsWith('/') || next.startsWith('//')) return '/';
+  return next;
+}
+
 // Email + password sign-in. Composes the template's base shadcn primitives
 // (Button/Input/Label) styled through the theme tokens. Restyle freely — this
 // file is user-owned. Calls better-auth's authClient.signIn.email; on success
@@ -27,7 +33,7 @@ export function SignInForm() {
       setError(signInError.message ?? 'Could not sign in. Check your details.');
       return;
     }
-    window.location.assign('/');
+    window.location.assign(safeNextPath());
   }
 
   return (

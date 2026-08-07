@@ -41,7 +41,22 @@ export async function POST(req: Request) {
   try {
     const subscription = await prisma.$transaction(async (tx) => {
       const promo = await tx.subscriptionPromoCode.findUnique({ where: { code } });
-      if (!promo || promo.disabledAt) {
+      if (!promo) {
+        throw new Error('invalid_code');
+      }
+
+      const previousRedemption = await tx.subscriptionPromoRedemption.findUnique({
+        where: { codeId_userId: { codeId: promo.id, userId: user.id } },
+      });
+      if (previousRedemption) {
+        const subscription = await tx.userSubscription.findUnique({
+          where: { userId: user.id },
+        });
+        if (subscription) return subscription;
+        throw new Error('already_redeemed');
+      }
+
+      if (promo.disabledAt) {
         throw new Error('invalid_code');
       }
       if (promo.expiresAt && promo.expiresAt.getTime() < now.getTime()) {
@@ -51,19 +66,21 @@ export async function POST(req: Request) {
         throw new Error('fully_redeemed');
       }
 
-      const previousRedemption = await tx.subscriptionPromoRedemption.findUnique({
-        where: { codeId_userId: { codeId: promo.id, userId: user.id } },
+      const claimedUse = await tx.subscriptionPromoCode.updateMany({
+        where: {
+          id: promo.id,
+          disabledAt: null,
+          redeemedCount: { lt: promo.maxRedemptions },
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+        },
+        data: { redeemedCount: { increment: 1 } },
       });
-      if (previousRedemption) {
-        throw new Error('already_redeemed');
+      if (claimedUse.count !== 1) {
+        throw new Error('fully_redeemed');
       }
 
       await tx.subscriptionPromoRedemption.create({
         data: { codeId: promo.id, userId: user.id },
-      });
-      await tx.subscriptionPromoCode.update({
-        where: { id: promo.id },
-        data: { redeemedCount: { increment: 1 } },
       });
 
       const existingSubscription = await tx.userSubscription.findUnique({
@@ -102,6 +119,9 @@ export async function POST(req: Request) {
       fully_redeemed: 'That code has already been fully used.',
       already_redeemed: 'You already redeemed that code.',
     };
-    return Response.json({ error: errors[message] ?? 'Could not redeem that code.' }, { status: 400 });
+    return Response.json(
+      { error: errors[message] ?? 'Could not redeem that code.' },
+      { status: 400 },
+    );
   }
 }

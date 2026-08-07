@@ -3,7 +3,20 @@
 import { SignUpForm } from '@/components/custom/sign-up-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-export default function SignupPage() {
+interface SignupPageProps {
+  searchParams?: Promise<{ next?: string | string[] }>;
+}
+
+function safeNext(value?: string | string[]): string | null {
+  const next = Array.isArray(value) ? value[0] : value;
+  if (!next || !next.startsWith('/') || next.startsWith('//')) return null;
+  return next;
+}
+
+export default async function SignupPage({ searchParams }: SignupPageProps) {
+  const next = safeNext((await searchParams)?.next);
+  const loginHref = next ? `/login?next=${encodeURIComponent(next)}` : '/login';
+
   return (
     <main className="min-h-dvh flex items-center justify-center px-gutter py-section bg-[var(--background)]">
       <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
@@ -21,7 +34,7 @@ export default function SignupPage() {
           <p className="mt-4 text-center text-small text-muted-foreground">
             Already have an account?{' '}
             <a
-              href="/login"
+              href={loginHref}
               className="text-brand-600 font-medium hover:text-brand-700 hover:underline underline-offset-2 transition-colors"
             >
               Sign in

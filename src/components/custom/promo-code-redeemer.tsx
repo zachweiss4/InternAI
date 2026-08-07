@@ -34,7 +34,9 @@ export function PromoCodeRedeemer({ onRedeemed }: PromoCodeRedeemerProps) {
       };
 
       if (res.status === 401) {
-        window.location.assign('/login');
+        window.location.assign(
+          `/login?next=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`,
+        );
         return;
       }
       if (!res.ok || !body.subscription) {

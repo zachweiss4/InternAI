@@ -1,6 +1,6 @@
 'use client';
 
-import { Gift, ShieldCheck } from 'lucide-react';
+import { Gift, Link2, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -52,6 +52,12 @@ function formatDate(iso: string | null | undefined) {
     day: 'numeric',
     year: 'numeric',
   });
+}
+
+function accessLinkForCode(code: string) {
+  const path = `/free-access/${encodeURIComponent(code)}`;
+  if (typeof window === 'undefined') return path;
+  return `${window.location.origin}${path}`;
 }
 
 export function AdminPremiumIsland() {
@@ -130,10 +136,10 @@ export function AdminPremiumIsland() {
     try {
       const res = await fetch('/api/admin/promo-codes');
       const body = (await res.json().catch(() => ({}))) as { codes?: PromoCode[]; error?: string };
-      if (!res.ok) throw new Error(body.error ?? 'Could not load codes');
+      if (!res.ok) throw new Error(body.error ?? 'Could not load links');
       setPromoCodes(body.codes ?? []);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not load codes');
+      toast.error(err instanceof Error ? err.message : 'Could not load links');
     } finally {
       setCodeLoading(false);
     }
@@ -154,14 +160,14 @@ export function AdminPremiumIsland() {
         }),
       });
       const body = (await res.json().catch(() => ({}))) as { code?: PromoCode; error?: string };
-      if (!res.ok || !body.code) throw new Error(body.error ?? 'Could not create code');
+      if (!res.ok || !body.code) throw new Error(body.error ?? 'Could not create link');
       setPromoCodes((prev) => [body.code as PromoCode, ...prev]);
       setCustomCode('');
       setCodeNote('');
-      await navigator.clipboard?.writeText(body.code.code).catch(() => {});
-      toast.success(`Created code ${body.code.code}`);
+      await navigator.clipboard?.writeText(accessLinkForCode(body.code.code)).catch(() => {});
+      toast.success(`Created free access link for ${body.code.code}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not create code');
+      toast.error(err instanceof Error ? err.message : 'Could not create link');
     } finally {
       setCodeLoading(false);
     }
@@ -175,7 +181,9 @@ export function AdminPremiumIsland() {
       });
       const body = (await res.json().catch(() => ({}))) as { code?: PromoCode; error?: string };
       if (!res.ok || !body.code) throw new Error(body.error ?? 'Could not disable code');
-      setPromoCodes((prev) => prev.map((item) => (item.code === code ? (body.code as PromoCode) : item)));
+      setPromoCodes((prev) =>
+        prev.map((item) => (item.code === code ? (body.code as PromoCode) : item)),
+      );
       toast.success('Code disabled');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not disable code');
@@ -306,17 +314,20 @@ export function AdminPremiumIsland() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Gift className="size-5 text-brand-600" aria-hidden />
-              <CardTitle>Free access codes</CardTitle>
+              <CardTitle>Free access links</CardTitle>
             </div>
             <CardDescription>
-              Create a code someone can redeem from Pricing or Billing after signing in.
+              Create a limited-use link that automatically activates Basic or Premium after sign in.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="grid gap-2">
                 <Label>Plan</Label>
-                <Select value={codePlan} onValueChange={(value) => setCodePlan(value as typeof codePlan)}>
+                <Select
+                  value={codePlan}
+                  onValueChange={(value) => setCodePlan(value as typeof codePlan)}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -373,10 +384,10 @@ export function AdminPremiumIsland() {
 
             <div className="flex flex-wrap gap-2">
               <Button type="button" onClick={createCode} disabled={codeLoading}>
-                Create code
+                Create link
               </Button>
               <Button type="button" variant="outline" onClick={loadCodes} disabled={codeLoading}>
-                Load recent codes
+                Load recent links
               </Button>
             </div>
 
@@ -399,6 +410,9 @@ export function AdminPremiumIsland() {
                         {promo.redeemedCount}/{promo.maxRedemptions} used · {promo.months} months
                         {promo.note ? ` · ${promo.note}` : ''}
                       </p>
+                      <p className="mt-1 truncate text-xs text-muted-foreground">
+                        {accessLinkForCode(promo.code)}
+                      </p>
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -406,11 +420,14 @@ export function AdminPremiumIsland() {
                         size="sm"
                         variant="outline"
                         onClick={() => {
-                          navigator.clipboard?.writeText(promo.code).catch(() => {});
-                          toast.success('Code copied');
+                          navigator.clipboard
+                            ?.writeText(accessLinkForCode(promo.code))
+                            .catch(() => {});
+                          toast.success('Link copied');
                         }}
                       >
-                        Copy
+                        <Link2 className="mr-1.5 size-3.5" aria-hidden />
+                        Copy link
                       </Button>
                       {!promo.disabledAt && (
                         <Button

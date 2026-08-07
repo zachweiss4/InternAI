@@ -7,6 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { signUp } from '@/lib/auth-client';
 
+function safeNextPath(): string {
+  const next = new URLSearchParams(window.location.search).get('next');
+  if (!next || !next.startsWith('/') || next.startsWith('//')) return '/';
+  return next;
+}
+
 // Email + password sign-up. Composes the template's base shadcn primitives
 // (Button/Input/Label) styled through the theme tokens. Restyle freely — this
 // file is user-owned. Calls better-auth's authClient.signUp.email; better-auth
@@ -39,7 +45,7 @@ export function SignUpForm() {
         setError(signUpError.message ?? 'Could not create your account. Try again.');
         return;
       }
-      window.location.assign('/');
+      window.location.assign(safeNextPath());
     } catch {
       setError('Could not reach the signup service. Check the deployment URL and try again.');
     } finally {
