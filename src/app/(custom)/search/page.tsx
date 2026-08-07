@@ -1,5 +1,6 @@
 import { Building2, Globe2, Radar, Sparkles } from 'lucide-react';
 import type { Metadata } from 'next';
+import { InternAIThemeAtmosphere } from '@/components/custom/internai-theme-atmosphere';
 import { SearchIsland } from './search-island';
 
 export const metadata: Metadata = {
@@ -28,6 +29,7 @@ const SEARCH_SIGNALS = [
 export default function SearchPage() {
   return (
     <main className="editorial-home min-h-screen px-gutter pb-section-lg pt-[clamp(3rem,7vw,6rem)]">
+      <InternAIThemeAtmosphere className="internai-search-theme-canvas" />
       <div className="editorial-page">
         <header className="grid gap-8 border-b border-[var(--editorial-line)] pb-9 lg:grid-cols-[minmax(0,0.9fr)_minmax(24rem,0.65fr)] lg:items-end">
           <div>

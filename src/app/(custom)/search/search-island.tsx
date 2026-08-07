@@ -174,9 +174,12 @@ const QUICK_COMPANY_FILTERS = [
 function ModalityBadge({ modality }: { modality?: InternshipResult['modality'] }) {
   if (!modality) return null;
   const styles: Record<NonNullable<InternshipResult['modality']>, string> = {
-    remote: 'bg-brand-100 text-brand-700 border-brand-200',
-    hybrid: 'bg-amber-50 text-amber-700 border-amber-200',
-    'on-site': 'bg-slate-100 text-slate-700 border-slate-200',
+    remote:
+      'border-[var(--editorial-moss)]/35 bg-[var(--editorial-sage)] text-[var(--editorial-moss-deep)]',
+    hybrid:
+      'border-[var(--editorial-coral)]/40 bg-[var(--editorial-coral-soft)]/45 text-[var(--editorial-ink)]',
+    'on-site':
+      'border-[var(--editorial-line)] bg-[var(--editorial-cream-deep)] text-[var(--editorial-ink)]',
   };
   const labels: Record<NonNullable<InternshipResult['modality']>, string> = {
     remote: 'Remote',
@@ -195,10 +198,10 @@ function ModalityBadge({ modality }: { modality?: InternshipResult['modality'] }
 function ScoreBadge({ score }: { score: number }) {
   const color =
     score >= 80
-      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+      ? 'border-[var(--editorial-moss)]/40 bg-[var(--editorial-sage)] text-[var(--editorial-moss-deep)]'
       : score >= 60
-        ? 'bg-brand-50 text-brand-700 border-brand-200'
-        : 'bg-slate-50 text-slate-600 border-slate-200';
+        ? 'border-[var(--editorial-coral)]/40 bg-[var(--editorial-coral-soft)]/45 text-[var(--editorial-ink)]'
+        : 'border-[var(--editorial-line)] bg-[var(--editorial-cream-deep)] text-[var(--editorial-muted)]';
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${color}`}
@@ -266,20 +269,22 @@ function ResultCard({
   }
 
   return (
-    <Card className="group border-[var(--editorial-line)] bg-[var(--editorial-cream)] shadow-[0_12px_34px_rgb(31_43_34_/_0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--editorial-moss)] hover:shadow-md">
+    <Card className="internai-result-card group border-[var(--editorial-line)] bg-[var(--editorial-cream)] text-[var(--editorial-ink)] shadow-[0_12px_34px_rgb(31_43_34_/_0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--editorial-moss)] hover:shadow-md">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <CardTitle className="text-h4 leading-snug group-hover:text-brand-600 transition-colors">
+            <CardTitle className="text-h4 leading-snug text-[var(--editorial-ink)] transition-colors group-hover:text-[var(--editorial-moss-deep)]">
               {result.title}
             </CardTitle>
-            <p className="mt-1 text-body font-medium text-foreground">{result.company}</p>
+            <p className="mt-1 text-body font-medium text-[var(--editorial-ink)]">
+              {result.company}
+            </p>
           </div>
           <ScoreBadge score={result.matchScore ?? 50} />
         </div>
       </CardHeader>
       <CardContent className="pt-0 space-y-3">
-        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-[var(--editorial-muted)]">
           <span className="flex items-center gap-1">
             <svg
               className="h-3.5 w-3.5 shrink-0"
@@ -297,31 +302,40 @@ function ResultCard({
           </span>
           <ModalityBadge modality={result.modality} />
           {salary && (
-            <Badge variant="outline" className="text-xs font-medium">
+            <Badge
+              variant="outline"
+              className="border-[var(--editorial-line)] bg-[var(--editorial-paper)]/70 text-xs font-medium text-[var(--editorial-ink)]"
+            >
               {salary}
             </Badge>
           )}
           {result.seasonMatch && (
-            <Badge variant="outline" className="text-xs font-medium">
+            <Badge
+              variant="outline"
+              className="border-[var(--editorial-line)] bg-[var(--editorial-paper)]/70 text-xs font-medium text-[var(--editorial-ink)]"
+            >
               {result.seasonMatch === 'summer' ? 'Summer' : 'Fall'}
             </Badge>
           )}
-          <span className="text-xs text-muted-foreground/70">{posted}</span>
+          <span className="text-xs text-[var(--editorial-muted)]">{posted}</span>
           {result.source && (
-            <Badge variant="outline" className="text-xs font-medium">
+            <Badge
+              variant="outline"
+              className="border-[var(--editorial-line)] bg-[var(--editorial-paper)]/70 text-xs font-medium text-[var(--editorial-ink)]"
+            >
               {result.source}
             </Badge>
           )}
         </div>
         {result.description && (
-          <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+          <p className="line-clamp-2 text-sm leading-relaxed text-[var(--editorial-muted)]">
             {result.description}
           </p>
         )}
         {result.fitReasons && result.fitReasons.length > 0 && (
-          <div className="space-y-1.5 rounded-md border border-brand-100 bg-brand-50/45 p-3">
+          <div className="space-y-1.5 rounded-md border border-[var(--editorial-moss)]/30 bg-[var(--editorial-sage)]/55 p-3">
             {result.fitReasons.map((reason) => (
-              <p key={reason} className="text-xs font-medium text-brand-800">
+              <p key={reason} className="text-xs font-medium text-[var(--editorial-moss-deep)]">
                 {reason}
               </p>
             ))}
@@ -332,7 +346,7 @@ function ResultCard({
             asChild
             size="sm"
             variant="outline"
-            className="border-brand-200 text-brand-700 hover:bg-brand-50 hover:text-brand-800"
+            className="border-[var(--editorial-moss)]/40 bg-[var(--editorial-paper)] text-[var(--editorial-moss-deep)] hover:bg-[var(--editorial-sage)] hover:text-[var(--editorial-ink)]"
           >
             <a href={result.applyUrl} target="_blank" rel="noopener noreferrer">
               Apply now →
@@ -346,8 +360,8 @@ function ResultCard({
             onClick={handleApply}
             className={
               isApplied
-                ? 'text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-50'
-                : 'border border-border/60 text-muted-foreground hover:text-foreground'
+                ? 'border border-[var(--editorial-moss)]/35 bg-[var(--editorial-sage)] text-[var(--editorial-moss-deep)] hover:bg-[var(--editorial-sage)]'
+                : 'border border-[var(--editorial-line)] text-[var(--editorial-muted)] hover:bg-[var(--editorial-paper)] hover:text-[var(--editorial-ink)]'
             }
           >
             {isApplied ? 'Applied ✓' : applying ? 'Saving…' : 'Mark as Applied'}
@@ -360,8 +374,8 @@ function ResultCard({
             onClick={isSaved ? handleUnsave : handleSave}
             className={
               isSaved
-                ? 'text-brand-700 bg-brand-50 border border-brand-200 hover:bg-brand-50'
-                : 'border border-border/60 text-muted-foreground hover:text-foreground'
+                ? 'border border-[var(--editorial-coral)]/40 bg-[var(--editorial-coral-soft)]/45 text-[var(--editorial-ink)] hover:bg-[var(--editorial-coral-soft)]/55'
+                : 'border border-[var(--editorial-line)] text-[var(--editorial-muted)] hover:bg-[var(--editorial-paper)] hover:text-[var(--editorial-ink)]'
             }
             title={isSaved ? 'Remove from saved' : 'Save internship'}
           >
@@ -713,7 +727,10 @@ export function SearchIsland() {
             onCheckedChange={setProfileMatch}
             disabled={loading}
           />
-          <label htmlFor="profile-match" className="text-sm font-medium text-foreground">
+          <label
+            htmlFor="profile-match"
+            className="text-sm font-medium text-[var(--editorial-ink)]"
+          >
             Resume match
           </label>
         </div>
@@ -734,11 +751,13 @@ export function SearchIsland() {
 
       {/* Paywall prompt */}
       {paywallReason && !loading && (
-        <div className="rounded-xl border border-brand-200 bg-brand-50/60 p-8 text-center space-y-4">
+        <div className="space-y-4 rounded-xl border border-[var(--editorial-line)] bg-[var(--editorial-cream)] p-8 text-center text-[var(--editorial-ink)]">
           {paywallReason === 'unauthenticated' ? (
             <>
-              <p className="text-h4 font-semibold text-foreground">Sign in to search internships</p>
-              <p className="text-body text-muted-foreground">
+              <p className="text-h4 font-semibold text-[var(--editorial-ink)]">
+                Sign in to search internships
+              </p>
+              <p className="text-body text-[var(--editorial-muted)]">
                 Create a free account to get 3 searches per day - or upgrade for unlimited access.
               </p>
               <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
@@ -752,8 +771,10 @@ export function SearchIsland() {
             </>
           ) : (
             <>
-              <p className="text-h4 font-semibold text-foreground">Daily free limit reached</p>
-              <p className="text-body text-muted-foreground">
+              <p className="text-h4 font-semibold text-[var(--editorial-ink)]">
+                Daily free limit reached
+              </p>
+              <p className="text-body text-[var(--editorial-muted)]">
                 You&apos;ve used your 3 free searches for today. Upgrade to Basic or Premium for
                 unlimited searches.
               </p>
@@ -762,7 +783,9 @@ export function SearchIsland() {
                   <Link href="/pricing">View plans</Link>
                 </Button>
               </div>
-              <p className="text-sm text-muted-foreground">Free quota resets at midnight UTC.</p>
+              <p className="text-sm text-[var(--editorial-muted)]">
+                Free quota resets at midnight UTC.
+              </p>
             </>
           )}
         </div>
@@ -771,7 +794,7 @@ export function SearchIsland() {
       {/* Example queries */}
       {results === null && !paywallReason && !loading && (
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground font-medium">Try an example:</p>
+          <p className="text-sm font-medium text-[var(--editorial-muted)]">Try an example:</p>
           <div className="flex flex-wrap gap-2">
             {EXAMPLE_QUERIES.map((example) => (
               <button
@@ -808,8 +831,8 @@ export function SearchIsland() {
       {!loading && results !== null && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              <span className="font-semibold text-foreground">{total}</span>{' '}
+            <p className="text-sm text-[var(--editorial-muted)]">
+              <span className="font-semibold text-[var(--editorial-ink)]">{total}</span>{' '}
               {total === 1 ? 'result' : 'results'} for{' '}
               <span className="italic">&ldquo;{activeQuery}&rdquo;</span>
               {activeFilters.location && <> in {activeFilters.location}</>}
@@ -822,11 +845,11 @@ export function SearchIsland() {
           </div>
 
           {sortedResults?.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border/70 bg-muted/30 p-12 text-center">
-              <p className="text-body text-muted-foreground">
+            <div className="rounded-xl border border-dashed border-[var(--editorial-line)] bg-[var(--editorial-cream-deep)]/45 p-12 text-center">
+              <p className="text-body text-[var(--editorial-muted)]">
                 No internships found for this query.
               </p>
-              <p className="mt-1 text-sm text-muted-foreground/70">
+              <p className="mt-1 text-sm text-[var(--editorial-muted)]">
                 Try broadening your search or removing location filters.
               </p>
             </div>

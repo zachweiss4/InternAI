@@ -114,7 +114,7 @@ export function SiteNav() {
     'bg-[var(--editorial-ink)] text-[var(--editorial-paper)] hover:bg-[var(--editorial-moss-deep)] hover:text-[var(--editorial-paper)]';
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-[var(--editorial-line)] bg-[var(--editorial-paper)]/90 backdrop-blur-xl supports-[backdrop-filter]:bg-[var(--editorial-paper)]/78">
+    <header className="internai-site-nav sticky top-0 z-40 w-full border-b border-[var(--editorial-line)] bg-[var(--editorial-paper)]/90 backdrop-blur-xl supports-[backdrop-filter]:bg-[var(--editorial-paper)]/78">
       <nav
         aria-label="Primary"
         className="mx-auto flex h-[4.5rem] max-w-[82rem] items-center gap-2 px-gutter"
@@ -347,7 +347,7 @@ export function SiteFooter() {
   if (footer.length === 0) return null;
 
   return (
-    <footer className="border-t border-[var(--editorial-line)] bg-[var(--editorial-ink)] text-[var(--editorial-paper)]">
+    <footer className="internai-site-footer border-t border-[var(--editorial-line)] bg-[var(--editorial-ink)] text-[var(--editorial-paper)]">
       <div className="mx-auto grid max-w-[82rem] gap-10 px-gutter py-10 sm:py-12 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
         <div>
           <Link

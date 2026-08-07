@@ -7,6 +7,7 @@ import { InternAIFAQ } from '@/app/(custom)/internai-faq';
 import { InternAIFeatures } from '@/app/(custom)/internai-features';
 import { InternAIHero } from '@/app/(custom)/internai-hero';
 import { InternAIHowItWorks } from '@/app/(custom)/internai-how-it-works';
+import { InternAIThemeAtmosphere } from '@/components/custom/internai-theme-atmosphere';
 import { siteDescription, siteName } from '@/lib/site';
 
 // Keep this a Server Component so it can export metadata.
@@ -31,6 +32,7 @@ export const metadata: Metadata = {
 export default function SetupPlaceholder() {
   return (
     <main className="editorial-home">
+      <InternAIThemeAtmosphere />
       <InternAIHero />
       <InternAIFeatures />
       <InternAIHowItWorks />

@@ -19,7 +19,7 @@ export function InternAICTA() {
         transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
         className="editorial-page"
       >
-        <div className="relative overflow-hidden rounded-[20px] border border-[var(--editorial-line)] bg-[var(--editorial-ink)] px-6 py-10 text-[var(--editorial-paper)] shadow-[var(--editorial-shadow)] sm:px-10 sm:py-14 lg:px-14">
+        <div className="internai-cta-panel relative overflow-hidden rounded-[20px] border border-[var(--editorial-line)] bg-[var(--editorial-ink)] px-6 py-10 text-[var(--editorial-paper)] shadow-[var(--editorial-shadow)] sm:px-10 sm:py-14 lg:px-14">
           <div
             aria-hidden="true"
             className="absolute -right-20 -top-28 h-80 w-80 rounded-full border border-white/15 bg-[var(--editorial-moss)] opacity-40"

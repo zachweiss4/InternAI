@@ -67,7 +67,7 @@ export function InternAIHowItWorks() {
               decision in your hands.
             </p>
 
-            <div className="mt-8 rounded-[16px] border border-[var(--editorial-line)] bg-[var(--editorial-ink)] p-5 text-[var(--editorial-paper)] shadow-[var(--editorial-shadow)]">
+            <div className="internai-trust-panel mt-8 rounded-[16px] border border-[var(--editorial-line)] bg-[var(--editorial-ink)] p-5 text-[var(--editorial-paper)] shadow-[var(--editorial-shadow)]">
               <div className="flex items-center justify-between gap-4 border-b border-white/15 pb-4">
                 <span className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--editorial-coral-soft)]">
                   What stays visible

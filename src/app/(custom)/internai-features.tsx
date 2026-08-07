@@ -127,10 +127,10 @@ export function InternAIFeatures() {
                 transition={{ duration: 0.6, delay: (index % 2) * 0.08, ease: [0.16, 1, 0.3, 1] }}
                 className={`editorial-feature-card group relative flex min-h-[20rem] flex-col justify-between overflow-hidden rounded-[16px] border border-[var(--editorial-line)] p-6 sm:p-8 ${
                   feature.tone === 'ink'
-                    ? 'bg-[var(--editorial-ink)] text-[var(--editorial-paper)]'
+                    ? 'feature-tone-ink bg-[var(--editorial-ink)] text-[var(--editorial-paper)]'
                     : feature.tone === 'coral'
-                      ? 'bg-[var(--editorial-coral)] text-[#30231f]'
-                      : 'bg-[var(--editorial-cream)] text-[var(--editorial-ink)]'
+                      ? 'feature-tone-coral bg-[var(--editorial-coral)] text-[#30231f]'
+                      : 'feature-tone-glass bg-[var(--editorial-cream)] text-[var(--editorial-ink)]'
                 } ${feature.className}`}
               >
                 <div

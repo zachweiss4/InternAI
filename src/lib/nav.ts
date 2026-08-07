@@ -30,6 +30,7 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { label: 'Home', href: '/', group: 'primary', order: 0 },
   { label: 'Search', href: '/search', group: 'primary', order: 1 },
+  { label: 'Design Lab', href: '/design-lab', group: 'primary', order: 2 },
   { label: 'Saved', href: '/saved', group: 'primary', order: 2, requiresAuth: true },
   { label: 'Alerts', href: '/alerts', group: 'primary', order: 3, requiresAuth: true },
   { label: 'Applications', href: '/applications', group: 'primary', order: 4, requiresAuth: true },

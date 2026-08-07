@@ -62,8 +62,8 @@ export function InternAIHero() {
       <div className="internai-orb internai-orb-two" aria-hidden="true" />
 
       <div className="editorial-page relative">
-        <div className="grid gap-12 lg:grid-cols-[minmax(0,0.92fr)_minmax(32rem,1.08fr)] lg:items-center lg:gap-14">
-          <div>
+        <div className="grid gap-12 xl:grid-cols-[minmax(0,1.12fr)_minmax(30rem,0.88fr)] xl:items-center xl:gap-14">
+          <div className="min-w-0">
             <motion.div {...reveal(0)} className="internai-status-pill mb-7">
               <span className="internai-status-dot" aria-hidden="true" />
               Search network online
@@ -73,10 +73,10 @@ export function InternAIHero() {
 
             <motion.h1
               {...reveal(0.08)}
-              className="editorial-serif max-w-4xl text-[clamp(3.5rem,7.4vw,6.9rem)] leading-[0.88]"
+              className="editorial-serif max-w-4xl text-[clamp(3.5rem,6.2vw,6.1rem)] leading-[0.88]"
             >
               Your internship search,{' '}
-              <span className="editorial-mark relative inline-block">finally intelligent.</span>
+              <span className="editorial-mark relative">finally intelligent.</span>
             </motion.h1>
 
             <motion.p {...reveal(0.16)} className="editorial-copy mt-7 max-w-2xl text-balance">
