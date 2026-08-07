@@ -75,7 +75,7 @@ export function FreeAccessLinkRedeemer({ code }: FreeAccessLinkRedeemerProps) {
   }, [code, isPending, session?.user]);
 
   return (
-    <main className="min-h-dvh px-gutter py-section bg-[var(--background)]">
+    <main className="min-h-dvh bg-transparent px-gutter py-section">
       <div className="mx-auto flex min-h-[70dvh] max-w-lg items-center">
         <Card className="w-full border-border/70 shadow-brand">
           <CardHeader className="space-y-3 text-center">

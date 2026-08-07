@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { FreeAccessLinkRedeemer } from '@/components/custom/free-access-link-redeemer';
+import { InternAIAppShell } from '@/components/custom/internai-app-shell';
 
 export const metadata: Metadata = {
   title: 'Free access',
@@ -20,5 +21,9 @@ function cleanCode(value: string): string {
 
 export default async function FreeAccessPage({ params }: FreeAccessPageProps) {
   const { code } = await params;
-  return <FreeAccessLinkRedeemer code={cleanCode(code)} />;
+  return (
+    <InternAIAppShell>
+      <FreeAccessLinkRedeemer code={cleanCode(code)} />
+    </InternAIAppShell>
+  );
 }
