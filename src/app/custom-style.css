@@ -481,12 +481,54 @@ body:has(.editorial-home) {
 }
 
 .dark .internai-site-footer {
-  border-top-color: rgb(255 255 255 / 0.24);
-  background:
-    radial-gradient(circle at 82% 4%, rgb(112 223 244 / 0.18), transparent 25rem),
-    linear-gradient(135deg, #02040a, #090e18 58%, #03050b);
+  border-top-color: rgb(159 238 255 / 0.42);
+  background: #020308;
+  color: #fff;
+  box-shadow:
+    inset 0 2px rgb(112 223 244 / 0.28),
+    0 -20px 70px rgb(0 0 0 / 0.38);
+}
+
+.dark .internai-site-footer .internai-footer-brand {
+  color: #fff;
+  text-shadow: 0 0 28px rgb(112 223 244 / 0.18);
+}
+
+.dark .internai-site-footer .internai-footer-copy {
+  color: rgb(244 248 255 / 0.9);
+}
+
+.dark .internai-site-footer .internai-footer-link {
+  border-color: rgb(255 255 255 / 0.24);
+  background: rgb(255 255 255 / 0.11);
   color: #fff;
   box-shadow: inset 0 1px rgb(255 255 255 / 0.12);
+}
+
+.dark .internai-site-footer .internai-footer-link:hover {
+  border-color: rgb(159 238 255 / 0.58);
+  background: rgb(112 223 244 / 0.18);
+}
+
+.dark .internai-site-footer .internai-footer-search {
+  border-color: rgb(173 242 255 / 0.52);
+  background: #c7f6ff;
+  color: #061016;
+  box-shadow: 0 10px 32px rgb(85 218 245 / 0.2);
+}
+
+.dark .internai-site-footer .internai-footer-search:hover {
+  background: #e2fbff;
+  color: #02070a;
+}
+
+.dark .internai-site-footer .internai-footer-meta-shell {
+  border-top-color: rgb(255 255 255 / 0.25);
+  background: #000105;
+}
+
+.dark .internai-site-footer .internai-footer-meta {
+  color: rgb(244 248 255 / 0.78);
 }
 
 @media (hover: hover) and (pointer: fine) {

@@ -353,14 +353,14 @@ export function SiteFooter() {
           <Link
             href="/"
             aria-label={`${siteName} home`}
-            className="inline-flex items-center gap-2.5 text-xl font-extrabold tracking-[-0.04em]"
+            className="internai-footer-brand inline-flex items-center gap-2.5 text-xl font-extrabold tracking-[-0.04em]"
           >
             <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[var(--editorial-coral)] text-[#30231f]">
               <Orbit aria-hidden="true" className="h-[1.1rem] w-[1.1rem]" />
             </span>
             InternAI
           </Link>
-          <p className="mt-4 max-w-md text-sm leading-7 text-white/80">
+          <p className="internai-footer-copy mt-4 max-w-md text-sm leading-7 text-white/85">
             Find better internships, understand the match, and keep every application moving in one
             focused workspace.
           </p>
@@ -373,7 +373,7 @@ export function SiteFooter() {
               asChild
               variant="ghost"
               size="sm"
-              className="rounded-[8px] text-white/90 hover:bg-white/10 hover:text-white"
+              className="internai-footer-link rounded-[8px] border border-white/15 bg-white/5 text-white hover:bg-white/15 hover:text-white"
             >
               <Link href={item.href}>{item.label}</Link>
             </Button>
@@ -382,7 +382,7 @@ export function SiteFooter() {
             asChild
             variant="ghost"
             size="sm"
-            className="rounded-[8px] text-[var(--editorial-coral-soft)] hover:bg-white/10 hover:text-white"
+            className="internai-footer-search rounded-[8px] border border-white/20 bg-white/10 text-[var(--editorial-coral-soft)] hover:bg-white/20 hover:text-white"
           >
             <Link href="/search">
               Search now
@@ -391,8 +391,8 @@ export function SiteFooter() {
           </Button>
         </nav>
       </div>
-      <div className="border-t border-white/20">
-        <div className="mx-auto flex max-w-[82rem] flex-col gap-2 px-gutter py-5 text-xs text-white/70 sm:flex-row sm:items-center sm:justify-between">
+      <div className="internai-footer-meta-shell border-t border-white/20">
+        <div className="internai-footer-meta mx-auto flex max-w-[82rem] flex-col gap-2 px-gutter py-5 text-xs text-white/75 sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} InternAI. Built for ambitious students.</p>
           <p>Real sources. Clear fit. Better follow-through.</p>
         </div>
